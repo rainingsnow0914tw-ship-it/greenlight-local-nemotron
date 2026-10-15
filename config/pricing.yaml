@@ -1,0 +1,466 @@
+# Greenlight — 價目表
+#
+# 設計理由：
+#   價格是「會變的事實」，不是「程式邏輯」。Google 隨時可能調價、出新檔位、
+#   停用舊 model ID（veo-3.0-generate-001 已停用）。
+#   所以價格一律放這裡，cost_engine.py 只負責算數學，不認識任何具體數字。
+#
+# 資料來源：Vertex AI / Gemini API 公開定價（查證日期見 last_verified）。
+#   這些數字必須在正式估價前用實際帳單校準一次。
+#   改價格只改這個檔，不要動 code。
+
+currency: USD
+last_verified: "2026-08-07"
+
+# ---------------------------------------------------------------------------
+# Veo 影片生成
+#
+# 重點：Veo 3.1 全檔位「原生音訊免費包含」，跟 Veo 3.0 不同（3.0 要加 50%）。
+#       所以不需要為配音另外編列預算，voiceover/SFX/music 都在這個價錢裡。
+# ---------------------------------------------------------------------------
+veo:
+  model_family: "veo-3.1"
+
+  # 產品內的預設與可選檔位：
+  #   Lite 已下架：它不支援角色參考圖 —— 一致性是這個產品的核心賣點，
+  #   一個會靜默關掉核心賣點的檔位不該出現在選單上。
+  #   設定保留（enabled: false）是因為 ledger 歷史統計還引用它。
+  #   Omni Flash 為主引擎：口型一致、聲音品質較佳、支援對話式編輯；
+  #   價格同 $0.10/秒。已知代價：固定 10 秒、無續拍、Preview 狀態。
+  #   Veo 各檔下架不拆（enabled: false 保留）：Omni 是 Preview，
+  #   若在使用期間出事，一行 config 就能救回。
+  default_tier: omni_flash_720p
+  # Greenlight Local：本機檔位排第一；設定頁選「本機引擎」時預設就是它（config_loader.default_veo_tier）
+  selectable_tiers: [h3_local_4step, omni_flash_720p]
+
+  tiers:
+    h3_local_4step:
+      # Greenlight Local：使用者自己的顯示卡跑 MiniMax H3（本機 ComfyUI）。不花錢（電費另計）。
+      # 提示詞走作者管線的六行寫法（engines/h3_prompt.py），不走雲端的 prompt_export。
+      label: "Local MiniMax H3 · 4-step"
+      model_id: "minimax-h3-ref2v-4step"
+      engine: "local"
+      per_second_usd: 0.0
+      resolution: "736p"
+      audio_included: true
+      supports_reference_images: true
+      supports_first_frame: false               # 首幀接末幀還沒接進來（下一步）
+      max_continuity_chain: 0
+      use_case: "你的顯示卡（驗證過：RTX 5090 Laptop 24GB），一鏡約 5～6 分鐘，不花錢。"
+    omni_flash_720p:
+      label: "Omni Flash · 720p"
+      model_id: "gemini-omni-flash-preview"
+      engine: "omni"                            # 走 Interactions API，不是 Veo predictLongRunning
+      per_second_usd: 0.10                      # 實測 57,920 tokens / 10 秒 ≈ $1.01
+      fixed_seconds: 10                         # 分鏡預設長度。實際可調 3s–10s（response_format.duration）
+      resolution: "720p"
+      audio_included: true
+      supports_reference_images: true           # task=reference_to_video，官方上限 10 張、這裡用 6
+      # 實測：task=image_to_video 餵進去的圖就是第一幀 ——
+      # 拿上一鏡的末幀當輸入，生出來的影片第一幀是同一個畫面（人物、姿勢、
+      # 背景、色溫全部延續）。不是「風格參考」那種像，是真的接在那一格上。
+      supports_first_frame: true
+      # 接幀與參考圖互斥：task 一次只能一個。接幀鏡不帶參考圖 ——
+      # 首幀本身已經帶著角色的臉，不需要再鎖一次。
+      #
+      # 接幀鏈長上限。
+      #
+      # 設得寬鬆（10）而不是 4 的理由：
+      #   斷開時回到角色參考圖，而參考圖只鎖角色長相、不鎖場景，
+      #   所以模型會重新想像一個場景。真正的取捨不是
+      #   「跳接感 vs 漂移」，是「場景重置 vs 漂移」—— 前者嚴重得多：
+      #   漂移只是慢慢變得不太像，場景重置是整個畫面換了地方。
+      #
+      #   這條上限不該是主要的斷點。場次邊界才是 ——
+      #   continuity.decide() 對跨場次一律否決，那是結構性的、
+      #   永遠正確的斷點。鏈長上限只是防止單一場景拍太多鏡時
+      #   無限累積漂移，所以它應該設得夠寬鬆，讓大多數場景根本碰不到它。
+      #   「10」尚無實測依據 —— ClickHouse 累積夠重拍紀錄之後，
+      #   應該用「鏈上第幾鏡」對重拍率的關係去校準。
+      max_continuity_chain: 10
+      use_case: "主力檔位。口型與配音一致性最佳，支援生成後對話式修改。"
+
+    lite_720p:
+      label: "Lite · 720p"
+      model_id: "veo-3.1-lite-generate-001"
+      per_second_usd: 0.05
+      resolution: "720p"
+      audio_included: true
+      enabled: false                           # 已下架，理由見上
+      # 實測：Lite 不支援 referenceImages（角色參考圖）。
+      # 形狀正確仍回「The request is not supported by this model」。
+      supports_reference_images: false
+      use_case: "（已下架）開發期試打用。不支援角色參考圖。"
+
+    fast_720p:
+      label: "Fast · 720p"
+      model_id: "veo-3.1-fast-generate-001"   # 實測可用（參考圖驗證跑的就是它）
+      per_second_usd: 0.10
+      resolution: "720p"
+      audio_included: true
+      enabled: false                           # 隨 Veo 下架（保留當 Omni 的緊急備援）
+      supports_reference_images: true          # 實測 8 秒生成成功
+      use_case: "錄 demo 的預設檔位。品質/成本平衡點。"
+
+    fast_4k:
+      label: "Fast · 4K"
+      model_id: "veo-3.1-fast-generate-001"
+      per_second_usd: 0.30
+      resolution: "4K"
+      audio_included: true
+      enabled: false                           # 隨 Veo 下架（保留當 Omni 的緊急備援）
+      supports_reference_images: true          # 跟 fast_720p 同一個 model，能力跟著 model 走
+      use_case: "需要大螢幕播放時才用。3 分鐘 = $54，本專案預算下不建議全片使用。"
+
+    standard_720p:
+      label: "Standard · 720p"
+      model_id: "veo-3.1-generate-001"        # 實證跑過這個 ID
+      per_second_usd: 0.40
+      resolution: "720p"
+      audio_included: true
+      enabled: false                           # 隨 Veo 下架（保留當 Omni 的緊急備援）
+      supports_reference_images: false         # 未實測（Standard 一次 $3.2）。實測支援後改 true
+      use_case: "最高保真。只在最後精修關鍵鏡頭時用。"
+
+    standard_1080p:
+      label: "Standard · 1080p"
+      model_id: "veo-3.1-generate-001"
+      per_second_usd: 0.40
+      resolution: "1080p"
+      audio_included: true
+      enabled: false                           # 隨 Veo 下架（保留當 Omni 的緊急備援）
+      use_case: "跟 720p 同價，所以 Standard 檔沒理由選 720p。"
+
+    standard_4k:
+      label: "Standard · 4K"
+      model_id: "veo-3.1-generate-001"
+      per_second_usd: 0.60
+      resolution: "4K"
+      audio_included: true
+      enabled: false                           # 隨 Veo 下架（保留當 Omni 的緊急備援）
+      use_case: "🔴 3 分鐘 = $108 —— 一支片就吃掉總額度的四成。UI 上要標紅警告。"
+
+  # -------------------------------------------------------------------------
+  # 長度限制
+  #
+  # 這是整個分鏡設計的物理約束，改動前先確認官方文件。
+  #
+  # 單次生成只能是 4 / 6 / 8 秒三個值之一（durationSeconds 參數），
+  # 不是任意整數。所以「每段 15 秒」不能靠單次生成達成。
+  #
+  # 但 Veo 3.1 有 Extend（續拍）：在已生成的影片後面接 +7 秒，
+  # 最多 20 次，總長可達約 148 秒。
+  #
+  #   8 秒基底 + 1 次 extend = 15 秒
+  #   8 秒基底 + 2 次 extend = 22 秒
+  #
+  # Extend 與「外部接首尾幀」的差別：
+  #   Extend  = 模型內部續拍，連戲品質好，但只能往後接、不能指定末幀
+  #   首尾幀鏈 = 由本系統把上一鏡末幀當下一鏡首幀，可控性高但接縫較明顯
+  #
+  # 規則：同一個鏡頭內要延長 → 用 extend；換鏡頭 → 用首尾幀鏈或硬切。
+  # -------------------------------------------------------------------------
+  clip_limits:
+    allowed_seconds: [4, 6, 8]      # 只能是這三個值
+    default_seconds: 8
+    # 實測：帶 referenceImages 時只支援 8 秒
+    # （4 秒被拒：「supported durations are [8] for feature reference_to_video」）。
+    # 4 秒或 6 秒的鏡頭帶參考圖會整鏡失敗，所以 video_gen 會自動略過參考圖並記警告。
+    reference_images_allowed_seconds: [8]
+
+  # -------------------------------------------------------------------------
+  # 畫面比例
+  #
+  # Veo 的 aspectRatio 參數只接受這兩個值。沒有 1:1、沒有 4:3、沒有 2.39:1。
+  # 想要電影黑邊寬銀幕的話要在後製裁切，不是生成時指定。
+  #
+  # 實測（scripts/probes/verify_aspect_ratio.py）：
+  #   veo-3.1-lite-generate-001 + aspectRatio="9:16" → 實際輸出 720 × 1280，
+  #   確實是直式。「API 會強制轉 16:9」的說法在這個模型上不成立。
+  #
+  #   驗證方法：API 回 200 不代表它照做了。
+  #   一定要把檔案存下來量寬高（那支腳本用純 Python 解析 MP4 的 tkhd box，
+  #   不需要裝 ffmpeg）。換模型或換檔位時要重驗。
+  #
+  # 比例不只是畫框 —— 它會改變鏡頭難度：
+  #   直式的橫向空間只有橫式的三分之一，遠景與多人場面塞不下，
+  #   模型會把人擠在一起或裁掉。但特寫在直式反而更自然。
+  # -------------------------------------------------------------------------
+  aspect_ratios:
+    "16:9":
+      label: "橫式 16:9"
+      label_en: "Landscape 16:9"
+      label_ja: "横位置 16:9"
+      hint: "YouTube、電視、電影感。遠景與多人場面的預設選擇。"
+      hint_en: "YouTube, television, cinematic. The default for wide shots and group scenes."
+      hint_ja: "YouTube・テレビ・映画的な画。引きの画や複数人の場面はこちら。"
+      difficulty_modifier: 0.0
+      shot_type_penalties: {}
+      character_count_multiplier: 1.0
+
+    "9:16":
+      label: "直式 9:16"
+      label_en: "Portrait 9:16"
+      label_ja: "縦位置 9:16"
+      hint: "TikTok、Reels、Shorts。特寫與單人戲的預設選擇。"
+      hint_en: "TikTok, Reels, Shorts. The default for close-ups and single-character scenes."
+      hint_ja: "TikTok・リール・ショート。寄りの画や一人芝居はこちら。"
+      # 直式在訓練資料裡的佔比低於橫式，整體略難。
+      difficulty_modifier: -0.03
+      # 遠景在直式特別吃虧 —— 橫向資訊被砍掉三分之二。
+      shot_type_penalties:
+        EXTREME_WIDE: -0.12
+        WIDE: -0.07
+      # 直式塞多人更難，人數的懲罰要放大。
+      character_count_multiplier: 1.4
+
+  extend:
+    # ═══════════════════════════════════════════════════════════════════════
+    # 預設關閉
+    # ═══════════════════════════════════════════════════════════════════════
+    #
+    # 續拍在有台詞的鏡頭上有兩個問題，一個是實作面、一個是機制限制：
+    #
+    #   1. 台詞被重複 —— 續拍時若送同一份完整提示詞（含台詞段），
+    #      模型就照著又講一次。這個修得掉（續拍時剝掉台詞與音效）。
+    #
+    #   2. 音色會變 —— Veo 續拍時重新決定配音音色，前 8 秒與後 7 秒
+    #      變成兩個人在講話。這個修不掉，是模型行為不是提示詞問題。
+    #
+    # 所以結論是：只要那一鏡有台詞，續拍就會破壞配音連續性。
+    # 而這個產品處理的是劇本，有台詞的鏡頭是多數。
+    #
+    # 保留機制與開關（沒有台詞的純畫面長鏡頭仍然可能有價值），
+    # 但預設關閉，分鏡階段也不再主動規劃續拍。
+    enabled: false
+    disabled_reason: "續拍會重新決定配音音色，有台詞的鏡頭會變成兩個人在講話"
+    seconds_per_extension: 7
+    max_extensions: 20
+    max_total_seconds: 148
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # 實測確認的呼叫形狀（scripts/probes/verify_extend.py）
+    # ═══════════════════════════════════════════════════════════════════════
+    #
+    #   POST {model}:predictLongRunning
+    #   {
+    #     "instances": [{
+    #       "prompt": "...",
+    #       "video": {"bytesBase64Encoded": "<前一段 mp4>", "mimeType": "video/mp4"}
+    #     }],
+    #     "parameters": {"durationSeconds": 7, "sampleCount": 1, "generateAudio": true}
+    #   }
+    #
+    # 實測結果：4.01 秒 → 11.05 秒（+7.04），720×1280 直式比例保持。
+    # 回應是 inline base64（`bytesBase64Encoded` + `mimeType`），不是 GCS。
+    #
+    # 餵進去的是硬碟上的檔案，不是同一個 operation 的產物。
+    # 也就是說續拍不需要保留任何 operation 狀態 —— 已存的片段隨時可以撈回來續接。
+    # 這讓「中斷後恢復」與「先生完再挑哪幾鏡要加長」都變得可行，
+    # 批次生成不必把整條鏈鎖在同一個 session 裡。
+    #
+    # 仍未確認：計費是按新增秒數還是輸出總秒數。
+    # Lite 720p 的例子：按新增 7 秒 = $0.35、按總長 11 秒 = $0.55。
+    # API 不回計費資訊，只能對 Cloud Billing 帳單。
+    # 在確認之前維持保守假設（按總秒數），寧可高估不要低估。
+    billing_assumption: "per_output_second"
+    verified_shape: "instances[].video.bytesBase64Encoded + parameters.durationSeconds"
+    verified_response: "inline_base64"
+    accepts_uploaded_video: true
+
+# ---------------------------------------------------------------------------
+# Imagen 圖片生成 — 用於角色參考圖（每個角色三張候選）
+# ---------------------------------------------------------------------------
+imagen:
+  # ═════════════════════════════════════════════════════════════════════════
+  # 實測發現：Imagen 已經不存在了
+  # ═════════════════════════════════════════════════════════════════════════
+  #
+  # 用 API 列出 us-central1 的 publisher models，一個 imagen-* 都沒有。
+  # 圖片生成已經併進 Gemini 家族：
+  #     gemini-3-pro-image / gemini-3.1-flash-image / gemini-3.1-flash-lite-image
+  #
+  # 舊的 `imagen-4.0-generate-001` 已下架，舊的呼叫路徑會死。
+  #
+  # API 形狀完全不同，不是換個 model id 就好：
+  #
+  #   舊 Imagen：POST {model}:predict
+  #              {"instances":[{"prompt":...}], "parameters":{"sampleCount":1}}
+  #              → predictions[].bytesBase64Encoded
+  #
+  #   新 Gemini：POST {model}:generateContent
+  #              {"contents":[...], "generationConfig":{"responseModalities":["IMAGE"]}}
+  #              → candidates[].content.parts[].inlineData.{mimeType,data}
+  #
+  # 保留 `imagen:` 這個鍵名是為了不動到 cost_engine 的既有呼叫，
+  # 但底下的內容已經全部是 Gemini 模型。
+  model_family: "gemini-image"
+  api_shape: "generateContent"     # 不是 predict
+  requires_global_endpoint: true   # 跟其他 Gemini 3.x 一樣只在 global
+
+  tiers:
+    fast:
+      label: "Gemini 3.1 Flash Image"
+      model_id: "gemini-3.1-flash-image"        # 實測 200，回 1.28MB PNG
+      per_image_usd: 0.02                        # 待確認：Gemini image 按 token 計費，
+                                                 # 這是換算後的估計值，用實際帳單校準
+      use_case: "角色候選圖預設檔位。三張約 $0.06。"
+
+    standard:
+      label: "Gemini 3 Pro Image"
+      model_id: "gemini-3-pro-image"            # 實測 200，回 1.10MB PNG
+      per_image_usd: 0.06                        # 待確認
+      use_case: "選定角色後，重生一張高品質版當正式參考圖。"
+
+    lite:
+      label: "Gemini 3.1 Flash-Lite Image"
+      model_id: "gemini-3.1-flash-lite-image"   # 存在於清單，尚未實測
+      per_image_usd: 0.01                        # 待確認
+      use_case: "大量草稿。目前沒用到，列著讓「還有更便宜的」是可見的。"
+
+# ---------------------------------------------------------------------------
+# Gemini 文字/多模態 — 劇本解析、分鏡規劃、提示詞撰寫
+#
+# 這一層幾乎不花錢：一份 90 頁劇本約 40K token，用 3.5 Flash 跑一次約 $0.06。
+# 所以「規劃階段全開放」在成本上是安全的。
+# 單位：每 1M token。
+# ---------------------------------------------------------------------------
+gemini:
+  # -------------------------------------------------------------------------
+  # 哪個工作用哪顆
+  #
+  # 原則：依任務性質派工，不是依價格排序。
+  #    Pro   需要通盤理解的推理：讀完整份劇本、認出同一角色的不同稱呼、切章
+  #    Flash 有明確格式與規則的產出：提示詞、翻譯、看片清點
+  #    Lite  量大而單純的批次工作
+  #
+  # 劇本解析不用 Flash —— 不是因為 Flash 不好，是因為劇本解析屬於前一類工作。
+  #
+  #   一份 90 頁劇本約 40K token。Pro 比 Flash 貴多少？
+  #     輸入 40K × ($2.00 - $1.50)/1M = $0.02
+  #     輸出 20K × ($12 - $7.50)/1M   = $0.09
+  #     合計約 $0.11
+  #
+  #   為了省 $0.11 而讓整條鏈路最關鍵的一步用弱一點的模型，不划算 ——
+  #   劇本解析錯了（場景切錯、角色漏抓、時間推估歪掉），
+  #   後面分鏡、預算、成功率全部跟著錯，而且錯得很難發現。
+  #
+  #   分工原則：
+  #     需要推理與長上下文整體判斷  → Pro
+  #     有明確 schema 的重複性工作  → Flash
+  #
+  # 版本現況：
+  #   Pro 線與 Flash 線是獨立的版本序列，數字大小不能跨線比較。
+  #   Pro 線目前可用的最新是 3.1 Pro（1M context）；
+  #   3.5 Pro 尚未普遍開放 —— 開放後要重新評估。
+  #   Gemini 2.5 全系列已排定退役，不要用。
+  #
+  # 實測：Gemini 3.x 全系列只在 global endpoint。
+  #   us-central1 一律 404，不只 Pro，Flash / Flash-Lite / image 模型全部一樣。
+  #   實測過的：3.6-flash / 3.5-flash / 3.5-flash-lite / 3-flash-preview /
+  #            3.1-flash-lite / 3.1-pro-preview → global 全 200、us-central1 全 404。
+  #   所以每個 tier 都要 requires_global_endpoint: true。
+  # -------------------------------------------------------------------------
+  tiers:
+    pro:
+      label: "Gemini 3.1 Pro"
+      model_id: "gemini-3.1-pro-preview"          # 實證跑過
+      input_per_1m_usd: 2.00
+      input_per_1m_usd_over_200k: 4.00
+      output_per_1m_usd: 12.00
+      # 實測確認：global 200 / us-central1 404
+      requires_global_endpoint: true
+      use_case: >-
+        預設。劇本解析、場景切分、分鏡規劃、Story Bible ——
+        所有需要整體判斷與推理的工作。1M context 能一次吃完整份長劇本。
+
+    flash:
+      label: "Gemini 3.6 Flash"
+      model_id: "gemini-3.6-flash"
+      requires_global_endpoint: true            # 實測：global 200 / us-central1 404
+      input_per_1m_usd: 1.50
+      output_per_1m_usd: 7.50
+      use_case: >-
+        批次寫提示詞、把中文鏡頭描述翻成英文 visual_prompt ——
+        這類工作有明確 schema、答案空間窄，不需要 Pro 的推理能力。
+
+    flash_lite:
+      label: "Gemini 3.5 Flash-Lite"
+      model_id: "gemini-3.5-flash-lite"
+      requires_global_endpoint: true            # 實測確認
+      input_per_1m_usd: 0.30
+      output_per_1m_usd: 2.50
+      use_case: >-
+        純機械性的轉換與分類。目前沒有用到 ——
+        列在這裡是為了讓「還有更便宜的選項」這件事是可見的。
+
+  # 各工作階段預設用哪一顆。agent 實作時讀這裡，不要在 code 裡寫死 model id。
+  assignments:
+    script_parsing: pro       # 最關鍵的一步，不省這個錢
+    # 內容安全預審。用 pro 的理由：這是語境判斷不是關鍵字比對 ——
+    # 實測同一句台詞在完整提示詞裡被擋、在簡化版裡通過。
+    # 45 分鐘的劇本掃一次約 $0.05，相對一鏡 $1 是白撿的。
+    script_screening: pro
+    segmentation: pro         # 分段要判斷敘事完整性，輸入很小（只有場次摘要）約 $0.03
+    shot_planning: pro
+    story_bible: pro
+    # 角色詮釋（選角關卡的文字階段）。用 pro 的理由跟劇本解析一樣：
+    # 劇本沒寫外貌時要從對話語氣、人際關係、劇情功能反推一個人長什麼樣，
+    # 那是讀潛台詞的工作。輸入很小（只有角色資訊 + 幾段台詞），
+    # 一輪約 $0.005 —— 比同一輪的圖片成本 $0.06 低一個數量級，沒有省的必要。
+    character_design: pro
+    prompt_writing: flash
+    translation: flash
+    # 聽生成好的影片、描述音色。用 flash：這是描述既有事實不是推理，
+    # 而且每個角色只做一次（第一次有台詞的鏡頭之後就鎖定）。
+    voice_profiling: flash
+    # 看片檢核（frame_auditor）：清點畫面人數與可讀文字，對照分鏡表。
+    # 8 秒片約 $0.002 —— 一個右下角冒出來的人頭要重拍 $0.80，這道保險便宜 400 倍。
+    frame_audit: flash
+    # 提煉層：把 ClickHouse 的統計變成「這樣寫成功率高」的規律。
+    # 用 flash 的理由 —— 輸入是已經聚合好的數字（幾百 token），
+    # 工作是「照著數字寫成人話」不是推理；而且每完成一段才跑一次。
+    # 它產出的東西會被注入之後每一次規劃，所以重點在別亂寫，
+    # 不在聰明。system prompt 裡「沒有證據就少寫幾條」那段比模型檔位重要。
+    refinery: flash
+
+# ---------------------------------------------------------------------------
+# 基礎設施 — 估算用，不精算
+# ---------------------------------------------------------------------------
+nemotron:
+  # Greenlight Local：文字工作預設走 Nemotron（使用者自己的 Nebius Token Factory 金鑰）。
+  # 價格是 Token Factory 自己的 /v1/models?verbose=true 回報的（問的），每百萬 tokens 美元。
+  last_verified: "2026-10-09"
+  models:
+    "nvidia/nemotron-3-super-120b-a12b": {input_per_1m_usd: 0.3, output_per_1m_usd: 0.9}
+    "nvidia/Nemotron-3-Ultra-550b-a55b": {input_per_1m_usd: 1.0, output_per_1m_usd: 3.0}
+    "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {input_per_1m_usd: 0.06, output_per_1m_usd: 0.24}
+
+infrastructure:
+  clickhouse_vm:
+    machine_type: "e2-small"
+    region: "us-central1"
+    monthly_usd: 13.0
+    note: "自架 ClickHouse。不用 ClickHouse Cloud 因為 30 天試用蓋不住使用期間。"
+  cloud_run:
+    monthly_usd: 2.0
+    note: "低流量，幾乎在免費額度內。"
+  cloud_storage:
+    monthly_usd: 1.0
+    note: "存生成的影片與參考圖。"
+
+# ---------------------------------------------------------------------------
+# 預算護欄 — cost_engine 用這些值判斷要不要示警
+# ---------------------------------------------------------------------------
+guardrails:
+  # 總額度是專案可用的雲端 credits 上限。
+  # 這不是變成不用管錢：全片 40 分鐘 Omni 制估 $238，
+  # 接近額度上限 —— 「哪幾章值得拍」仍然是要做的取捨。
+  total_budget_usd: 250.0
+  # 單段警告門檻要跟總額度成比例：一章 10 分鐘的 Omni 分鏡本來就要 $20-50，
+  # 門檻設太低會變成「每一章都在示警」——
+  # 警告到處都是就等於沒有警告。
+  warn_threshold_usd: 35.0         # 單次規劃超過這個數字，UI 顯示黃色警告
+  block_threshold_usd: 90.0        # 超過這個數字，UI 顯示紅色並要求二次確認
+  max_retries_per_shot: 2          # 重試上限。沒有這條會無限燒錢
+  test_shot_required_above_usd: 5.0  # 總預估超過這個數字，強制先試拍一鏡

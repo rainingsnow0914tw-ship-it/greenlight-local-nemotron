@@ -1,0 +1,139 @@
+# Greenlight — 影片風格預設
+#
+# 提供幾種可選的視覺風格（寫實 / 日式動畫 / 3D / 定格 / 繪本），
+# 使用者用按鈕選，不必自己在提示詞裡描述畫風。
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# 為什麼風格要進 config，而不是讓使用者自己在提示詞裡寫「動畫風」
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 最反直覺、也最有價值的一件事：寫實風是最難的，動畫風容錯高得多。
+#
+# 原因是恐怖谷。觀眾對真人的破綻極度敏感 —— 手指多一根、臉頰肌肉抽動一下、
+# 走路重心不對，一眼就看出來。同樣的瑕疵放在 2D 動畫裡，觀眾會當成畫風。
+#
+# 這對預算有限的編劇是關鍵資訊：同一份劇本、同一筆錢，換個風格
+# 成功率可能差 20 個百分點。但沒有人會告訴他這件事 ——
+# 這正是本產品該主動講的。
+#
+# 而且風格會改變「哪些物理約束適用」：
+#   寫實風要嚴格要求手部解剖；2D 動畫的手本來就簡化，過度要求反而破壞畫風。
+#   定格動畫需要的是「保持黏土質感與微小抖動」，跟寫實風的要求完全相反。
+#
+# 所以風格不是提示詞前面加個形容詞，是一整套參數組合。
+
+version: '0.1'
+default_style: photoreal
+presets:
+- id: photoreal
+  label: 實拍寫實
+  label_en: Photoreal
+  one_liner: 像真人拍的。最有臨場感，但也最容易被看出破綻。
+  prompt_prefix: Live-action cinematic footage. Shot on 35mm film with a shallow depth of field, natural skin texture, realistic motion blur, physically accurate lighting.
+  # 本機引擎（H3）的風格行：作者管線的提示詞是中文。未實測。
+  prompt_prefix_zh: 實拍電影畫面，35mm 底片拍攝，淺景深，自然的皮膚質感，真實的動態模糊，符合物理的光線。
+  difficulty_modifier: -0.1
+  constraint_weight_overrides:
+    hand_anatomy: 1.3
+    fluid_physics: 1.2
+    no_morphing: 1.2
+  best_for: 現代都市、寫實劇情、紀錄片式敘事
+  caution: 恐怖谷效應：觀眾對真人的破綻最敏感。預算有限時， 寫實風的重拍次數通常是動畫風的兩倍以上。
+  label_ja: 実写
+  one_liner_en: Looks like it was filmed. Most present — and most easily caught out.
+  one_liner_ja: 実写のような質感。臨場感は最高だが、粗も一番見える。
+  best_for_en: Contemporary drama, realistic settings, documentary-style narration
+  best_for_ja: 現代劇、リアルな設定、ドキュメンタリー的な語り
+  caution_en: 'Uncanny valley: audiences catch flaws in real humans fastest. On a tight budget, photoreal typically needs twice the retries of animation.'
+  caution_ja: 不気味の谷 —— 実在の人間の粗は最も見破られやすい。予算が限られる場合、実写はアニメの倍の撮り直しが必要になりがち。
+- id: anime
+  label: 日式動畫
+  label_en: Anime (2D cel)
+  one_liner: 賽璐璐畫風。容錯最高，同樣的錢能拍更多。
+  prompt_prefix: Japanese animation style, 2D cel-shaded, clean line art with flat colour fills, expressive character design, hand-painted background art, subtle film grain.
+  # 本機引擎（H3）的風格行：作者管線的提示詞是中文。作者十章動畫實際送出的那一句。
+  prompt_prefix_zh: 日本動畫，2D 賽璐璐上色，線條乾淨，背景手繪，帶一點底片顆粒。
+  difficulty_modifier: 0.12
+  constraint_weight_overrides:
+    hand_anatomy: 0.5
+    fluid_physics: 0.7
+    no_morphing: 1.4
+  extra_inject: Consistent line weight and colour palette across all frames. No 3D rendering, no photorealistic texture.
+  best_for: 青春劇、奇幻、情感濃度高的題材、需要誇張表演的戲
+  caution: 口型與日式動畫的對嘴慣例不同，台詞多的鏡頭仍需注意。
+  label_ja: 日本アニメ
+  one_liner_en: Cel-shaded 2D. Most forgiving — the same money goes further.
+  one_liner_ja: セル画調の2D。許容度が最も高く、同じ予算でより多く撮れる。
+  best_for_en: Coming-of-age, fantasy, emotionally heightened material, expressive performance
+  best_for_ja: 青春もの、ファンタジー、感情の濃い題材、誇張した芝居
+  caution_en: Lip-sync follows different conventions in anime; shots with heavy dialogue still need care.
+  caution_ja: 口パクの作法が実写と異なるため、台詞の多いカットは要注意。
+- id: animated_3d
+  label: 3D 動畫
+  label_en: 3D animated
+  one_liner: 立體 CG 質感。角色一致性最穩，適合長片。
+  prompt_prefix: Stylised 3D animated film, soft global illumination, subsurface scattering on skin, appealing character design with simplified proportions, clean rendered surfaces.
+  # 本機引擎（H3）的風格行：作者管線的提示詞是中文。未實測。
+  prompt_prefix_zh: 風格化的 3D 動畫電影，柔和的全域光照，皮膚有次表面散射，討喜的角色設計、比例簡化，乾淨的渲染表面。
+  difficulty_modifier: 0.06
+  constraint_weight_overrides:
+    hand_anatomy: 0.8
+    no_morphing: 1.1
+    consistent_light_direction: 1.2
+  best_for: 闔家觀賞、寓言、需要非人角色（動物、玩偶）的題材
+  caution: 角色比例一旦設定就不能飄。建議每個角色都先產生參考圖。
+  label_ja: 3DCG
+  one_liner_en: Rendered CG. Best character consistency — suited to longer pieces.
+  one_liner_ja: 立体的なCG。キャラの一貫性が最も安定し、長尺向き。
+  best_for_en: Family viewing, fable, stories needing non-human characters
+  best_for_ja: ファミリー向け、寓話、非人間キャラが必要な題材
+  caution_en: Once proportions are set they must not drift. Generate a reference image for every character.
+  caution_ja: 体型比率は一度決めたらぶれさせない。全キャラの参照画像を用意すること。
+- id: stop_motion
+  label: 定格動畫
+  label_en: Stop-motion
+  one_liner: 黏土偶動畫。質感獨特，但動作限制多。
+  prompt_prefix: Stop-motion animation with visible handcrafted materials, clay and felt textures, slight frame-to-frame jitter, practical miniature set lighting, shallow tabletop depth of field.
+  # 本機引擎（H3）的風格行：作者管線的提示詞是中文。未實測。
+  prompt_prefix_zh: 定格動畫，看得見手作材質，黏土和毛氈質感，每一格之間有輕微抖動，微縮模型的實景燈光，桌面般的淺景深。
+  difficulty_modifier: 0.02
+  constraint_weight_overrides:
+    hand_anatomy: 0.6
+    fluid_physics: 0.4
+    no_morphing: 0.7
+  extra_inject: Motion has the characteristic stepped quality of stop-motion. Materials look physically handmade, not digitally rendered.
+  best_for: 童話、黑色幽默、獨立短片
+  caution: 快速動作與流暢運鏡跟這個風格衝突，分鏡時要避開。
+  label_ja: ストップモーション
+  one_liner_en: Clay and puppets. Distinctive texture, but limits the motion you can stage.
+  one_liner_ja: 粘土や人形の質感。独特だが、付けられる動きに制約がある。
+  best_for_en: Fairy tale, dark comedy, independent short film
+  best_for_ja: おとぎ話、ブラックコメディ、インディー短編
+  caution_en: Fast action and fluid camera moves fight this style — avoid them at the breakdown stage.
+  caution_ja: 速い動きと滑らかなカメラワークはこの画風と相性が悪い。コンテ段階で避けること。
+- id: painterly
+  label: 手繪繪本
+  label_en: Painterly / storybook
+  one_liner: 水彩繪本感。最不寫實，也最不容易崩。
+  prompt_prefix: Painterly storybook illustration in motion, visible watercolour and gouache brushwork, soft edges, textured paper grain, muted harmonious palette.
+  # 本機引擎（H3）的風格行：作者管線的提示詞是中文。未實測。
+  prompt_prefix_zh: 會動的手繪繪本插畫，看得見水彩和不透明水彩的筆觸，邊緣柔和，紙張紋理，柔和協調的色調。
+  difficulty_modifier: 0.15
+  constraint_weight_overrides:
+    hand_anatomy: 0.3
+    fluid_physics: 0.3
+    screen_facing_camera: 0.8
+    no_morphing: 0.9
+  best_for: 詩意敘事、回憶、兒童故事、旁白為主的片
+  caution: 不適合需要精確表演或密集對白的戲 —— 繪本風的臉部細節不足以承載微表情。
+  label_ja: 絵本・水彩
+  one_liner_en: Watercolour storybook. Least literal, and least likely to break.
+  one_liner_ja: 水彩絵本の質感。最も写実から遠く、最も崩れにくい。
+  best_for_en: Poetic narration, memory, children's stories, voiceover-led pieces
+  best_for_ja: 詩的な語り、回想、児童向け、ナレーション主体の作品
+  caution_en: Not for precise performance or dense dialogue — the faces lack the detail to carry micro-expression.
+  caution_ja: 繊細な芝居や台詞の多い場面には不向き —— 表情の機微を支える描き込みがない。
+advisory:
+  suggest_alternative_when_success_below: 0.45
+  suggest_alternative_when_over_budget: true
+  message_template: 目前風格「{current}」預估 ${current_cost}、一次過關率 {current_rate}%。 改用「{alternative}」預估 ${alt_cost}、一次過關率 {alt_rate}% —— 風格是創作決定，這只是提供資訊。

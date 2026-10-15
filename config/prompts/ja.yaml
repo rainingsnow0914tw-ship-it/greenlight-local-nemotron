@@ -1,0 +1,43 @@
+# Greenlight — 日本語 語言檔
+#
+# 這個檔只放語言差異：術語慣例、寫作風格、UI 文案。
+# 分鏡與解析的規則在 base.yaml，只有一份 —— 改一次三種語言都生效。
+#
+# 為什麼術語慣例不能共用：日文的「引き／なめ」跟中文的「過肩／泛焦」
+# 不是翻譯關係，是各自語言的現場詞彙。這部分才真的需要分開。
+#
+# 編輯這個檔不會影響其他語言。
+
+meta:
+  code: ja
+  name: 日本語
+  name_en: Japanese
+  writing_conventions: 映像用語は日本の現場で使われる語彙を優先する （ロングショット／寄り／引き／なめ／パン／フィックス）。 情緒は形容詞ではなく、具体的な物・光・所作で表現する。
+agents:
+  prompt_writer:
+    style_guidance: アニメ表現の用語をそのまま使ってよい（引きの画、寄り、なめ、 パンフォーカス、逆光、コントラストの強い影）。 英訳して精度を落とすより、日本語のまま渡したほうが伝わる概念が多い。
+    negative_suffix: ウォーターマーク、ロゴ、画面内の字幕は入れないこと。
+ui:
+  app_name: Greenlight
+  tagline: 脚本から、映像へ
+  stages:
+    parsed: 本読み
+    look_chosen: 画づくり
+    tier_chosen: 予算決定
+    cast_locked: キャスティング
+    prompts_ready: プロンプト
+    test_shot_passed: テスト撮影
+    generating: 撮影
+    assembled: 仕上げ
+  actions:
+    next: 次へ
+    back: 戻る
+    reroll: 引き直す
+    select: これにする
+    export: 書き出す
+  labels:
+    estimated_cost: 概算費用
+    success_rate: 一発OK率
+    prior_only: 事前推定
+    measured: 実測値
+    risk_shots: 注意が必要なカット

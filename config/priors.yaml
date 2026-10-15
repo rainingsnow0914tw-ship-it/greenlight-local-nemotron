@@ -1,0 +1,255 @@
+# Greenlight — 成功率先驗值
+#
+# 這個檔案回答一個問題：ClickHouse 是空的時候，成功率怎麼估？
+#
+# 設計理由：
+#   「成功率預估」是本產品的核心賣點，但第一個用戶進來的時候資料庫沒有半筆資料。
+#   如果這時候開天窗說「無法估算」，整個產品的說服力就崩了。
+#   所以用一組先驗值開局，每跑一次真實生成就往 ClickHouse 寫一筆，
+#   success_predictor 會用實際資料逐步覆蓋先驗（見 services/success_predictor.py）。
+#
+#   這些是估計值不是實測值。UI 上必須誠實標示資料來源是
+#   「先驗估計」還是「N 次實測」。不准假裝有資料。
+#
+# 先驗基礎的來源：
+#   公開的 text-to-video benchmark 指出，80%+ 的 AI 生成片段需要重工，
+#   平均每個片段 2.67 個問題。反推一次過關率約在 20% 上下。
+#   base 設在 0.35，因為那份 benchmark 涵蓋各家模型與無參考圖的裸生成，
+#   而本系統一律走 Story Bible + 參考圖流程，起點應該高於平均。
+#
+#   base_success_rate 是整個估算最敏感的參數。第一批實測資料進來後
+#   務必回頭校準這個數字，並在 docs/ 記錄校準過程。
+
+version: "0.1"
+last_calibrated: null          # 還沒用實測資料校準過
+calibration_sample_size: 0
+
+# 一次生成就過關（不需要重試）的基準機率
+base_success_rate: 0.35
+
+# ---------------------------------------------------------------------------
+# 修正項
+#
+# 用加法不用乘法：這些是經驗性的調整量，加總後再 clamp 到 [0.05, 0.95]。
+# 乘法在多個修正項疊加時會塌到接近 0，跟直覺不符。
+# ---------------------------------------------------------------------------
+modifiers:
+
+  # 鏡別。畫面資訊量越大，模型出錯的地方越多。
+  shot_type:
+    EXTREME_WIDE: -0.12      # 大遠景：背景細節多、人物小、容易糊
+    WIDE:         -0.06
+    MEDIUM:        0.00      # 基準
+    MEDIUM_CLOSE: +0.04
+    CLOSE_UP:     +0.08      # 特寫：畫面單純，最穩
+    EXTREME_CLOSE: +0.05     # 大特寫有時反而會出現材質崩壞
+    INSERT:       +0.10      # 空鏡/物件鏡最好生
+
+  # 運鏡。攝影機動得越複雜，時間一致性越難維持。
+  camera_move:
+    STATIC:       +0.10
+    PAN:           0.00
+    TILT:          0.00
+    DOLLY:        -0.04
+    TRACKING:     -0.08
+    HANDHELD:     -0.12      # 手持晃動 + 內容變化，雙重難度
+    CRANE:        -0.10
+    ZOOM:         -0.05
+
+  # 畫面裡的人數。這是實務上最大的失敗來源 —— 多人互動時
+  # 臉、手、肢體交疊的崩壞機率非線性上升。
+  character_count:
+    "0":  +0.15              # 空鏡
+    "1":   0.00
+    "2":  -0.10
+    "3":  -0.18
+    "4+": -0.28              # 四人以上建議直接拆鏡，UI 要主動提示
+
+  # 有沒有台詞。對嘴（lip-sync）是目前所有影片模型的弱項。
+  has_dialogue: -0.06
+
+  # 有沒有角色參考圖。這是本架構的核心價值 —— Story Bible + Imagen 參考圖
+  # 帶來的一致性提升，是本產品相對於「裸 prompt 生成」的主要優勢。
+  has_reference_image: +0.20
+
+  # 有沒有從上一鏡接首幀（frame chaining）。
+  # 接續能大幅提升連戲感，但也會把上一鏡的瑕疵帶進來。
+  has_first_frame: +0.12
+  has_last_frame_target: -0.05   # 指定末幀等於多一個約束，反而更難達成
+
+  # 畫質檔位。低檔位省錢但細節崩壞率高，重試次數會上升。
+  tier:
+    # Omni 的修正值是估計（與 fast_720p 同解析度級距、口型與配音實測較佳，
+    # 先給同值 -0.03）。ledger 累積 20 筆後由實測接手。
+    omni_flash_720p: -0.03
+    # Greenlight Local：本機 H3 先給 0（沒有跨使用者的實測可以抄）。導演迴圈的關卡已經在開拍前擋掉
+    # 作者管線踩過的坑，真正的通過率由每個使用者自己的學習紀錄累積 20 筆後接手。
+    h3_local_4step: 0.00
+    lite_720p:     -0.10
+    fast_720p:     -0.03
+    fast_4k:       -0.06      # 4K 放大了所有瑕疵
+    standard_720p: +0.05
+    standard_1080p: +0.05
+    standard_4k:    +0.02
+
+  # 鏡頭長度。越長越容易在後半段失控。
+  # 合法值依引擎：Veo 4、6、8 秒，Omni 固定 10 秒（見 pricing.yaml）。
+  duration_seconds:
+    "4": +0.08
+    "6":  0.00
+    "8": -0.06
+    "10": -0.10    # 估計：比 8 秒再長，後段失控風險略增。待實測校準
+
+
+  # 每一次 Extend（續拍 +7 秒）帶來的額外風險。
+  # 續拍是在已生成的畫面上往後長，誤差會累積 —— 接得越多越容易漂移
+  # （角色臉部緩慢變形、光線飄移、背景物件消失）。
+  # 這個修正是「每次續拍」的懲罰，會乘上續拍次數。
+  per_extension_penalty: -0.07
+
+  # 特殊內容標記。這些是實務上已知的高風險項目。
+  content_flags:
+    hands_visible:      -0.08   # 手指數量錯誤是經典失敗
+    text_in_frame:      -0.15   # 畫面內文字幾乎必崩，建議後製加
+    fast_action:        -0.10
+    water_or_fire:      -0.07   # 流體模擬不穩
+    crowd:              -0.20   # 群眾場面
+    animal:             -0.09
+    period_costume:     -0.06   # 時代服裝考據容易出錯
+    night_scene:        -0.05
+    screen_in_frame:    -0.09   # 螢幕預設會背對鏡頭，構圖需要額外約束
+    countable_group:    -0.11   # 需要精確數量的畫面，模型無法保證
+    reflective_surface: -0.08   # 鏡面反射需要幾何推算，模型最弱的能力之一
+
+# 加總後的上下限。不允許出現 0% 或 100%，那是對用戶說謊。
+clamp:
+  min: 0.05
+  max: 0.95
+
+# ---------------------------------------------------------------------------
+# 先驗 vs 實測的混合權重
+#
+# 用 Bayesian 的思路：實測樣本越多，先驗的權重越低。
+# weight_prior = prior_strength / (prior_strength + n_observed)
+#
+# prior_strength = 20 的意思是：「這組先驗值大約等同於 20 次觀測的說服力」。
+# 所以看到 20 次實測時，先驗與實測各佔一半；看到 100 次時，先驗只剩 17%。
+# ---------------------------------------------------------------------------
+blending:
+  prior_strength: 20
+  min_samples_to_report_as_measured: 5   # 少於 5 筆，UI 一律標示「先驗估計」
+
+# ---------------------------------------------------------------------------
+# 重試的期望次數推導
+#
+# 若單次成功率為 p，且最多重試 R 次，
+# 期望生成次數 E = (1 - (1-p)^(R+1)) / p  的截斷版本。
+# 實作在 services/success_predictor.py，這裡只放參數。
+# ---------------------------------------------------------------------------
+retry_model:
+  max_retries: 2                # 與 pricing.yaml guardrails.max_retries_per_shot 一致
+  # 重試時會微調 prompt，成功率會略微提升（人為介入的價值）
+  retry_success_boost: 0.08
+
+# ---------------------------------------------------------------------------
+# 風險說明（三語）
+# ---------------------------------------------------------------------------
+#
+# 放在 config 而不是寫死在 success_predictor.py 的 dict 裡，兩個理由：
+#   1. 想微調措辭不必改 Python
+#   2. 走三語架構 —— 否則日文介面下這一整塊仍然顯示中文，
+#      而這一塊正好是產品最有價值的資訊（「為什麼這一鏡會失敗」）
+#
+# key 對應 modifiers 裡的欄位名與 content_flags，
+# success_predictor 只回 key，翻譯在 API 邊界才發生。
+risk_labels:
+  hands_visible:
+    label: 畫面中有手部特寫（手指數量容易出錯）
+    label_en: Hands in frame (finger count is a classic failure)
+    label_ja: 手が画面に入る（指の本数を間違えやすい）
+  text_in_frame:
+    label: 畫面內有文字（幾乎必崩，建議生成時留白、後製再疊字）
+    label_en: Text in frame (almost always fails — leave space and add it in post)
+    label_ja: 画面内に文字（ほぼ破綻する。余白を空けて後乗せ推奨）
+  fast_action:
+    label: 快速動作（動態模糊與肢體變形風險）
+    label_en: Fast action (motion blur and limb distortion)
+    label_ja: 速い動き（モーションブラーと手足の破綻）
+  water_or_fire:
+    label: 有水或火（流體模擬不穩定）
+    label_en: Water or fire (fluid simulation is unstable)
+    label_ja: 水や炎（流体シミュレーションが不安定）
+  crowd:
+    label: 群眾場面（人數越多崩壞率越高）
+    label_en: Crowd scene (failure rate climbs with head count)
+    label_ja: 群衆シーン（人数が増えるほど破綻率が上がる）
+  animal:
+    label: 有動物（毛髮與四肢容易變形）
+    label_en: Animals (fur and limbs distort easily)
+    label_ja: 動物（毛と四肢が崩れやすい）
+  period_costume:
+    label: 時代服裝（考據細節容易出錯）
+    label_en: Period costume (historical detail goes wrong easily)
+    label_ja: 時代衣装（考証のディテールを外しやすい）
+  night_scene:
+    label: 夜景（低光噪點與細節流失）
+    label_en: Night scene (low-light noise, detail loss)
+    label_ja: 夜のシーン（暗部ノイズとディテールの喪失）
+  many_characters:
+    label: 畫面中人物過多（建議拆鏡或改用過肩鏡頭）
+    label_en: Too many characters (split the shot, or go over-the-shoulder)
+    label_ja: 人物が多すぎる（カット割りか、肩なめに変更を推奨）
+  no_reference_image:
+    label: 沒有角色參考圖（一致性無法保證）
+    label_en: No character reference (consistency cannot be guaranteed)
+    label_ja: キャラクター参照画像なし（一貫性は保証できない）
+  has_dialogue:
+    label: 有台詞（對嘴是目前模型的弱項）
+    label_en: Dialogue present (lip-sync is the models' weakest area)
+    label_ja: 台詞あり（口パクは現行モデルの弱点）
+  screen_in_frame:
+    label: 畫面中有螢幕（預設會背對鏡頭，構圖需要額外約束）
+    label_en: A screen is in frame (it defaults to facing away; needs extra framing constraints)
+    label_ja: 画面内にスクリーン（既定でカメラに背を向ける。構図の追加制約が必要）
+  countable_group:
+    label: 需要精確數量的畫面（模型無法保證數對）
+    label_en: An exact count is required (models cannot guarantee the number)
+    label_ja: 正確な数が必要な画（モデルは数を保証できない）
+  reflective_surface:
+    label: 有鏡面反射（幾何推算是模型最弱的能力之一）
+    label_en: Reflective surface (reflection geometry is among the models' weakest abilities)
+    label_ja: 鏡面反射あり（反射の幾何はモデルが最も苦手な領域のひとつ）
+
+  # ---- 帶參數的風險說明 ----
+  # success_predictor 回的是 `key|參數1|參數2`，參數依序填進 {0} {1}。
+  # 這樣資料層只帶「是哪個風險 + 相關數值」，措辭與語序留給各語言自己決定 ——
+  # 中文說「續拍 3 次（共 29 秒）」，英文說 "3 extensions (29s total)"，
+  # 語序不同但參數一樣。
+  aspect_cramped:
+    label: "{0}的橫向空間有限，這種鏡別容易被擠壓或裁切"
+    label_en: "{0} leaves little horizontal room — this framing gets squeezed or cropped"
+    label_ja: "{0} は横方向の余裕が少なく、このサイズは詰まるか見切れやすい"
+  extension_drift:
+    label: "續拍 {0} 次（共 {1} 秒）—— 畫面會逐段累積漂移，建議超過兩次就改成拆鏡"
+    label_en: "Extended {0}× to {1}s total — drift accumulates with every extension; past two, split the shot instead"
+    label_ja: "延長 {0} 回（計 {1} 秒）—— 継ぎ足すたびにズレが蓄積する。2 回を超えるならカットを割ること"
+  style_unforgiving:
+    label: "「{0}」是容錯最低的風格"
+    label_en: "\"{0}\" is the least forgiving style"
+    label_ja: "「{0}」は最も許容度の低い画風"
+
+  # ---- 畫質方案的推薦理由（cost_engine 產生）----
+  # 跟風險說明放同一份，因為它們在 UI 上是同一種東西：
+  # 系統對這個規劃結果的判斷，用人話講出來。
+  best_within_budget:
+    label: "{0} 在預算安全範圍內（${1}）提供最高的一次過關率 {2}%。重拍次數少，實際花費比帳面數字更可預測。"
+    label_en: "{0} stays inside the budget guardrail (${1}) with the best first-pass rate at {2}%. Fewer retries means the real spend is more predictable than the sticker price."
+    label_ja: "{0} は予算の安全圏（${1}）で一発 OK 率が最も高く {2}%。撮り直しが少ない分、実際の出費は表示価格より読みやすい。"
+  all_in_warning_zone:
+    label: "所有可行檔位都已進入預算警戒區。{0} 預期總花費 ${1} 最低，建議先用它試拍確認效果。"
+    label_en: "Every viable tier is already in the budget warning zone. {0} has the lowest expected total at ${1} — use it for a test shot first."
+    label_ja: "実行可能な画質はすべて予算の警戒圏に入っている。{0} が想定総額 ${1} で最も低いので、まずこれでテスト撮影を。"
+  all_over_budget:
+    label: "所有檔位都超出預算護欄。{0} 是損失最小的選擇，但建議先縮短片長或減少鏡頭數。"
+    label_en: "Every tier breaks the budget guardrail. {0} loses the least, but shortening the runtime or cutting shots would be the better move."
+    label_ja: "どの画質も予算のガードレールを超えている。{0} が最も損失は小さいが、尺を詰めるかカット数を減らすほうがよい。"

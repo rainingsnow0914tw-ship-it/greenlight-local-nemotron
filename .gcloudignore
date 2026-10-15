@@ -1,0 +1,37 @@
+# 不要上傳到 Cloud Build 的東西。
+#
+# 這個檔案的存在理由：沒有它，gcloud 會把整個目錄打包上傳 ——
+# 包含 .venv（幾百 MB）、node_modules、outputs/ 的成片。
+# build 會慢到不合理，而且可能直接超時。
+
+.git/
+.gitignore
+
+# 環境變數 —— 絕對不能進 image。正式環境走 Cloud Run 的環境變數與 Secret Manager
+.env
+.env.local
+*.key
+*-service-account.json
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# 前端 build artifacts（源碼要進 image，讓 Dockerfile Stage 1 build 出 dist）
+# backend + frontend 一起打包到同一個 Cloud Run 服務，單一 URL。
+# frontend/ 源碼要進 build context，只排除 build 產物與 node_modules
+# （image 內會重新 npm ci + build）。
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# 生成產物
+outputs/
+*.mp4
+*.webm
+
+# 本機開發用
+deployment/clickhouse/
+docs/

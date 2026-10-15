@@ -1,0 +1,59 @@
+# Greenlight — Python 依賴
+#
+# runtime 只使用 Google 的 AI SDK（no other AI models, agent frameworks, or AI APIs）。
+# 所以這裡不會有 anthropic / openai / langchain / crewai / llama-index。
+
+# ---- 核心（Phase 1：規劃層，零 API 成本，本機就能跑）----
+pydantic>=2.9
+PyYAML>=6.0
+
+# ---- Web 層 ----
+fastapi>=0.115
+uvicorn[standard]>=0.32
+python-multipart>=0.0.12        # 劇本檔上傳
+# 明列，不靠 uvicorn[standard] 傳遞帶進來：
+# .env 是後端啟動的必要條件，靠別的套件順便裝進來，
+# 哪天 uvicorn 換了 extras 就會變成「換台機器就起不來」。
+python-dotenv>=1.0
+
+# ---- Google Cloud（Phase 2 起才會用到）----
+# runtime 走 ADK + genai。
+google-adk>=1.0.0
+google-genai>=1.0.0
+google-cloud-aiplatform[agent_engines,adk]>=1.101.0
+google-cloud-storage>=2.18
+# 專案狀態在 Cloud Run 上必須存 Firestore
+# （容器磁碟是暫時的，本機 JSON 一重啟就沒了）。
+# `FirestoreStore` 是延遲 import，但依賴仍必須在這裡宣告，
+# 否則部署後第一次呼叫就 500。
+google-cloud-firestore>=2.19
+
+# ---- Partner track：ClickHouse ----
+# 走官方 ClickHouse MCP server（mcp-clickhouse），runtime 真的會呼叫它。
+# 直連驅動（clickhouse-connect）只是 mcp-clickhouse 的間接相依，
+# 本專案的 code 不直接 import 它。
+mcp-clickhouse>=0.1
+
+# ---- 劇本解析 ----
+pypdf>=5.0                      # PDF 劇本讀取（純文字抽取，不做 OCR）
+# 拖放區支援 txt · md · docx · pdf · fountain，script_ingest 會 `import docx`，
+# 所以必須明列；沒宣告的話本機可能因為手動裝過而跑得起來，雲端上傳 .docx 會 500。
+python-docx>=1.1
+
+# ---- 接首尾幀 ----
+# 用 pip 版而不是系統 ffmpeg：binary 打包在 wheel 裡，
+# Cloud Run 部署不用改 Dockerfile。系統依賴會在部署那天才咬人。
+# 用途是抽上一鏡的末幀當下一鏡的起點 —— 沒有它，同場戲的相鄰鏡頭
+# 每一鏡都從零猜，角色的色溫與角度會漂移。
+imageio-ffmpeg>=0.5
+
+# 首幀照景別裁切（services/ref_images.py）：全景首幀跟空景逐像素比，找出人站在哪裡再裁
+pillow>=11.0
+pypinyin>=0.53   # 學語言模式：中文原聲的拼音讀音、繞口台詞關卡（language/gates.py）
+fugashi>=1.5    # 學語言模式：日文讀音字典（MIT；不用 pykakasi＝GPL-3.0，EXE 散布會被 GPL 綁住）
+unidic-lite>=1.0.8   # fugashi 的字典（約 250MB；UniDic 三重授權，取 BSD）
+numpy>=2.0
+faster-whisper==1.2.1   # 本機查證的聽寫（verify/asr.py，跑 CPU；模型 large-v3 用本機快取，沒有會下載約 3GB）
+
+# ---- 開發用 ----
+pytest>=8.0

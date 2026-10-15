@@ -1,0 +1,46 @@
+# Greenlight — 本機 ClickHouse
+#
+# 用途：開發期在自己機器上跑，零成本驗證 ledger 的讀寫與查詢邏輯。
+#       正式環境是 GCE e2-small 上的同一份 image
+#       （不用 ClickHouse Cloud：30 天試用期會在使用期間內到期）。
+#
+# 起：  docker compose -f deployment/clickhouse/docker-compose.yml up -d
+# 停：  docker compose -f deployment/clickhouse/docker-compose.yml down
+# 進 SQL：docker exec -it greenlight-clickhouse clickhouse-client
+#
+# schema.sql 會在容器第一次啟動時自動執行（掛在 initdb.d）。
+# 想重跑 schema：把 volume 砍掉再 up（down -v）。
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: greenlight-clickhouse
+    ports:
+      - "8123:8123"   # HTTP —— clickhouse-connect 走這個
+      - "9000:9000"   # Native protocol
+    environment:
+      CLICKHOUSE_DB: greenlight
+      CLICKHOUSE_USER: greenlight
+      CLICKHOUSE_PASSWORD: greenlight_dev
+      # 開發用。正式環境的密碼走 Secret Manager，不寫在 compose 檔裡。
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ulimits:
+      # ClickHouse 需要較高的檔案描述符上限，預設值會在啟動時噴警告
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      # 一定要用 127.0.0.1 不能用 localhost。
+      # 容器內 localhost 會先解析成 IPv6 的 ::1，而 ClickHouse 的 HTTP 介面
+      # 只綁在 IPv4 上 —— healthcheck 會永遠停在 starting、連不上但也不報錯，
+      # 害「等容器就緒」的腳本無限等待。
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  clickhouse_data:

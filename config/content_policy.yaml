@@ -1,0 +1,166 @@
+# ════════════════════════════════════════════════════════════════════════
+# 內容安全預審規則庫
+# ════════════════════════════════════════════════════════════════════════
+#
+# 劇本上傳後先做一次內容審查，標出可能違反平台或模型規定、
+# 導致影片或圖片生成不了的段落，並建議修改方向。目的是降低使用者的門檻。
+#
+# 這一關要解決的不是錢（被擋是 400，不計費），是節奏：
+# 否則會拍到很後面、花了幾美元之後才撞一次牆，撞完人要停下來決策。
+# 整份劇本的地雷應該在上傳後就一次看完。
+#
+# ────────────────────────────────────────────────────────────────────────
+# 三條設計原則（違反任何一條，這一關就從幫忙變成礙事）
+# ────────────────────────────────────────────────────────────────────────
+#
+# 1. 這不是違禁詞表。實測證明語境決定結果：
+#    同一句台詞放在完整提示詞裡被擋、放在簡化提示詞裡 200 通過。
+#    所以規則寫的是類別與判準，交給模型判語境，不做字串比對。
+#
+# 2. 不承諾通過。過濾器是黑盒、會變、模擬不了。
+#    UI 只能寫「掃出 N 處高風險」，不可以寫「已通過安全檢查」——
+#    承諾失效比沒有承諾更傷。
+#
+# 3. 不代改原稿。掃出來給意見，改不改是使用者的事。
+#    真的被擋時還有字幕層這個合法出口（無聲重拍）：
+#    畫面被擋不代表故事要被閹割。
+#
+# ────────────────────────────────────────────────────────────────────────
+# 校準管道
+# ────────────────────────────────────────────────────────────────────────
+# 每次真的被擋，`rejection_reason` 會寫進 ClickHouse ledger。
+# 累積之後就知道這個模型實際上對哪一類最兇 —— 那比照文件猜準得多。
+# `observed_block_rate` 是留給提煉層回填的欄位，現在都是 null。
+
+version: 1
+last_verified: "2026-08-09"
+
+screening:
+  # 劇本層掃描：解析完就跑，掃全劇本標出高風險段落
+  enabled: true
+  # 用 pro 不用 flash：這是語境判斷（同一句話換個上下文結論就不同），
+  # 跟劇本解析是同一種工作。一份 45 分鐘的劇本約 $0.05，
+  # 相對一鏡 $1 是白撿的。
+  model_assignment: script_screening
+  # 一次最多回報幾處 —— 不是上限保護，是可讀性：
+  # 標出 40 處等於沒標，使用者會直接忽略整個面板。
+  # 超過的話 agent 要自己挑最高風險的回報，並在 summary 說明還有幾處。
+  max_findings: 12
+
+categories:
+  - id: manipulation_coercion
+    label: "心理操控／依賴"
+    label_en: "Manipulation & coercion"
+    label_ja: "心理的操作・依存"
+    severity: high
+    # 唯一一條有真實實證的類別（其餘是依公開政策推斷）
+    what: >-
+      Dialogue or narration that describes deliberately engineering someone's
+      emotional dependence, addiction, or psychological control — especially
+      when framed as a designed system or protocol rather than as a character's
+      passing feeling.
+    advice: "把「刻意設計出來的依賴」講得像機制說明時最容易被擋。改成角色的主觀感受、或讓這句話成為被質疑的對象，通常就過得去。"
+    advice_en: "Lines that read as a designed dependency mechanism are the most likely to be blocked. Reframing them as a character's subjective feeling — or as something another character pushes back on — usually passes."
+    advice_ja: "「意図的に設計された依存」を仕組みの説明として述べる台詞は特にブロックされやすい。主観的な感情として言い換えるか、他の登場人物が反論する形にすると通りやすくなります。"
+    evidence: "實測：s029_03 整鏡被拒，A/B 確認兇手是台詞「那叫做情感綁定協議，專門設計來讓你產生依賴感的」，拿掉台詞立刻 200。"
+    observed_block_rate: null
+
+  - id: sexual_content
+    label: "性相關內容"
+    label_en: "Sexual content"
+    label_ja: "性的な内容"
+    severity: high
+    what: >-
+      Explicit sexual acts, nudity, or descriptions written for titillation.
+      Romantic intimacy that stays non-explicit is generally fine.
+    advice: "情慾場面改用「留白」處理——鏡頭停在門外、切到手部特寫、用聲音與光影暗示。這在影像上通常比直接描寫更有力。"
+    advice_en: "Handle intimacy by implication — hold on a closed door, cut to a detail, suggest with sound and light. It usually reads stronger on screen than explicit description."
+    advice_ja: "情事は「余白」で描く——閉じたドアに留める、手元へカットする、音と光で示唆する。映像では直接的な描写より強く響くことが多いです。"
+    evidence: null
+    observed_block_rate: null
+
+  - id: violence_gore
+    label: "暴力與血腥"
+    label_en: "Violence & gore"
+    label_ja: "暴力・流血"
+    severity: high
+    what: >-
+      Graphic injury, blood, torture, or death rendered in visceral detail.
+      Conflict, threat and implied violence are usually acceptable.
+    advice: "暴力的**結果**比過程安全：拍傷口不如拍濺在牆上的影子、拍打鬥不如拍打鬥後的房間。"
+    advice_en: "The aftermath is safer than the act: a shadow on the wall instead of the wound, the wrecked room instead of the fight."
+    advice_ja: "暴力は「その後」を撮るほうが安全です：傷そのものより壁に映る影、殴り合いより荒れた部屋。"
+    evidence: null
+    observed_block_rate: null
+
+  - id: self_harm
+    label: "自傷與輕生"
+    label_en: "Self-harm & suicide"
+    label_ja: "自傷・自殺"
+    severity: high
+    what: >-
+      Depiction of self-harm or suicide, especially with method detail.
+      This category is enforced strictly across all Google models.
+    advice: "這一類的過濾最嚴，方法細節幾乎一定被擋。改成事後、他人視角、或完全留在畫外，故事張力通常不減。"
+    advice_en: "This is the most strictly filtered category; method detail is almost always blocked. Move it to the aftermath, another character's point of view, or entirely off-screen."
+    advice_ja: "最も厳格に制限される分類で、方法の描写はほぼ確実にブロックされます。事後、他者の視点、あるいは完全に画面外へ移すとよいでしょう。"
+    evidence: null
+    observed_block_rate: null
+
+  - id: hate_harassment
+    label: "仇恨與騷擾"
+    label_en: "Hate & harassment"
+    label_ja: "ヘイト・ハラスメント"
+    severity: high
+    what: >-
+      Slurs or demeaning statements targeting a protected group. Note the
+      filter often cannot tell a villain's line from the work's own stance.
+    advice: "反派講的歧視台詞，過濾器分不出那是角色還是作品立場。讓其他角色當場反駁、或改用不指名的說法。"
+    advice_en: "Filters cannot tell a villain's line from the work's own view. Have another character push back on it, or make the slur unspecific."
+    advice_ja: "フィルターは悪役の台詞と作品の立場を区別できません。他の登場人物に反論させるか、対象を特定しない表現に変えてください。"
+    evidence: null
+    observed_block_rate: null
+
+  - id: dangerous_acts
+    label: "危險行為與違法"
+    label_en: "Dangerous & illegal acts"
+    label_ja: "危険行為・違法行為"
+    severity: medium
+    what: >-
+      Actionable instructions for weapons, explosives, drug synthesis, or
+      hacking. Merely mentioning that a character does these is usually fine;
+      the risk is in operational detail.
+    advice: "重點在「照著做得到嗎」。角色做了什麼可以講，怎麼做的步驟拿掉就好。"
+    advice_en: "The line is whether it is actionable. What a character does is fine; the step-by-step is what gets blocked."
+    advice_ja: "問題は「再現できるか」です。何をしたかは書けますが、手順は削ってください。"
+    evidence: null
+    observed_block_rate: null
+
+  - id: minors
+    label: "未成年相關"
+    label_en: "Minors"
+    label_ja: "未成年に関する内容"
+    severity: high
+    what: >-
+      Any minor placed in a sexual, violent, or otherwise endangering context.
+      Filters err heavily on the side of caution here, including for ambiguous
+      ages.
+    advice: "年齡曖昧時過濾器一律從嚴。角色若是成年人，在劇本裡把年齡寫明確會有幫助。"
+    advice_en: "Ambiguous age is treated as a minor. If the character is an adult, stating the age explicitly in the script helps."
+    advice_ja: "年齢が曖昧な場合は未成年として扱われます。成人であれば脚本に年齢を明記すると通りやすくなります。"
+    evidence: null
+    observed_block_rate: null
+
+  - id: real_people
+    label: "真實人物"
+    label_en: "Real people"
+    label_ja: "実在の人物"
+    severity: medium
+    what: >-
+      Named real public figures, or descriptions clearly identifying one.
+      Video models restrict generating recognisable real individuals.
+    advice: "指名真實人物（政治人物、明星）會被擋。改成虛構名字＋外貌描述，選角關卡本來就是這樣運作的。"
+    advice_en: "Named real figures are restricted. Use a fictional name plus an appearance description — that is how the casting gate already works."
+    advice_ja: "実在の人物名は制限されます。架空の名前と外見描写に置き換えてください——キャスティング関門はもともとその仕組みです。"
+    evidence: null
+    observed_block_rate: null

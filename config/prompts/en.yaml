@@ -1,0 +1,45 @@
+# Greenlight — English 語言檔
+#
+# 這個檔只放語言差異：術語慣例、寫作風格、UI 文案。
+# 分鏡與解析的規則在 base.yaml，只有一份 —— 改一次三種語言都生效。
+#
+# 為什麼術語慣例不能共用：日文的「引き／なめ」跟中文的「過肩／泛焦」
+# 不是翻譯關係，是各自語言的現場詞彙。這部分才真的需要分開。
+#
+# 編輯這個檔不會影響其他語言。
+
+meta:
+  code: en
+  name: English
+  name_en: English
+  writing_conventions: Use standard film-production vocabulary (wide, medium, close-up, dolly, pan, locked-off).
+    Carry emotion through concrete objects, light and action rather than stacked adjectives.
+agents:
+  prompt_writer:
+    style_guidance: 'English carries the widest film-production vocabulary and exports cleanly to other
+      tools. Stay concrete: specific objects, specific light, specific action.'
+    negative_suffix: No watermarks, no logos, no on-screen captions.
+ui:
+  app_name: Greenlight
+  tagline: From script to screen
+  stages:
+    parsed: Read-through
+    look_chosen: Look
+    tier_chosen: Budget
+    cast_locked: Casting
+    prompts_ready: Prompts
+    test_shot_passed: Test shot
+    generating: Shooting
+    assembled: Cut
+  actions:
+    next: Next
+    back: Back
+    reroll: Reroll
+    select: Choose this
+    export: Export
+  labels:
+    estimated_cost: Estimated cost
+    success_rate: First-pass rate
+    prior_only: Prior estimate
+    measured: Measured
+    risk_shots: Shots at risk

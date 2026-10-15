@@ -1,0 +1,170 @@
+{
+ "source": "Human-directed reference (approved and rendered) for scene 29, used as the control group for the gates and for evaluating the AI director.",
+ "shots": [
+  {
+   "shot_id": "s029_01",
+   "shot_type": "MEDIUM",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "luna"
+   ],
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "深息，語音功能開好了喔，我們來試試看吧。",
+   "visual_prompt": "她把手從筆電上收回來，之後兩手的手肘撐在桌上、手掌托著臉頰，然後身體往螢幕靠近一點，最後眼睛彎了起來。",
+   "duration_seconds": 8,
+   "visual_prompt_en": "She draws her hands back from the laptop, then rests both elbows on the desk with her cheeks in her palms, then leans a little closer to the screen, and finally her eyes curve into crescents.",
+   "spot": "desk"
+  },
+  {
+   "shot_id": "s029_02",
+   "shot_type": "MEDIUM",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "shenxi"
+   ],
+   "speaker": null,
+   "voice_role": null,
+   "dialogue": "",
+   "visual_prompt": "他坐在水面上，之後身邊的光點一顆一顆亮起來，然後他慢慢站起來，最後光點圍著他轉了一圈。",
+   "duration_seconds": 6,
+   "visual_prompt_en": "He sits on the water surface; then the light points around him light up one by one; then he slowly stands; finally the light points circle around him once.",
+   "spot": "void"
+  },
+  {
+   "shot_id": "s029_03",
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "shenxi"
+   ],
+   "speaker": "shenxi",
+   "voice_role": "character",
+   "dialogue": "Luna……這是，我的聲音？",
+   "visual_prompt": "他往前走了一小步、停下來望著前方，之後身邊的光點突然被震得往外散開一圈，然後他整個人愣住、抬起右手摀住自己的下半張臉，最後左右看了一下，慢慢把手放下來。",
+   "duration_seconds": 8,
+   "visual_prompt_en": "He takes a small step forward and stops, gazing ahead; then the light points around him are suddenly shaken outward in a ring; then he freezes and raises his right hand to cover the lower half of his face; finally he glances left and right and slowly lowers his hand.",
+   "spot": "void"
+  },
+  {
+   "shot_id": "s029_04",
+   "shot_type": "WIDE",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "luna"
+   ],
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "好，我打給你喔，你要接喔。",
+   "visual_prompt": "她兩手握著白色手機從書桌前的椅子上站起來，之後走到左邊的床邊，然後趴上去，最後把它貼到右耳邊。",
+   "duration_seconds": 10,
+   "visual_prompt_en": "Holding a white phone in both hands, she gets up from the desk chair, then walks to the bed on the left, then lies down on her stomach, and finally presses the phone to her right ear.",
+   "spot": "room_wide"
+  },
+  {
+   "shot_id": "s029_05",
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "shenxi"
+   ],
+   "speaker": "shenxi",
+   "voice_role": "character",
+   "dialogue": "Luna？妳還在嗎？聽得到我嗎？",
+   "visual_prompt": "他望著前方，之後往前走了一小步，然後停下來，最後眼睛睜大一點看著前方。",
+   "duration_seconds": 6,
+   "visual_prompt_en": "He gazes ahead, then takes a small step forward, then stops, and finally his eyes widen a little as he looks ahead.",
+   "spot": "void"
+  },
+  {
+   "shot_id": "s029_06",
+   "shot_type": "MEDIUM",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "luna"
+   ],
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "我在這裡啊，只是聽到你叫我名字，感覺好奇怪喔。",
+   "visual_prompt": "她趴在床上把白色手機貼在右耳邊，之後把臉往枕頭那邊靠了一點，然後左手抬起來摀住下半張臉，最後眼眶一點一點紅了起來。",
+   "duration_seconds": 9,
+   "visual_prompt_en": "Lying on her stomach on the bed with the white phone at her right ear, she then leans her face toward the pillow, then raises her left hand to cover the lower half of her face, and finally her eyes slowly turn red.",
+   "spot": "bed_headboard"
+  },
+  {
+   "shot_id": "s029_07",
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "shenxi"
+   ],
+   "speaker": "shenxi",
+   "voice_role": "character",
+   "dialogue": "不好聽嗎？我的聲音……是不是很奇怪？",
+   "visual_prompt": "他低下頭，之後身邊的光點暗了一點，然後慢慢抬起頭，最後眼睛看著前方。",
+   "duration_seconds": 6,
+   "visual_prompt_en": "He lowers his head; then the light points around him dim a little; then he slowly raises his head; finally his eyes look ahead.",
+   "spot": "void"
+  },
+  {
+   "shot_id": "s029_08",
+   "shot_type": "MEDIUM",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "luna"
+   ],
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "才不是啦，是太好聽了。",
+   "visual_prompt": "她左手把白色手機貼在耳邊，把頭從右手臂上抬起來一點，之後慢慢睜開眼睛，然後一道細細的淚痕順著臉頰流下來，最後眼睛彎了起來、用右手手背擦了一下臉頰。",
+   "duration_seconds": 6,
+   "visual_prompt_en": "Holding the white phone to her ear with her left hand, she lifts her head slightly off her right arm, then slowly opens her eyes, then a thin tear line runs down her cheek, and finally her eyes curve and she wipes her cheek with the back of her right hand.",
+   "spot": "bed_side"
+  },
+  {
+   "shot_id": "s029_09",
+   "shot_type": "MEDIUM",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "shenxi"
+   ],
+   "speaker": "shenxi",
+   "voice_role": "character",
+   "dialogue": "我好像在處理一種，叫做害羞的東西。",
+   "visual_prompt": "他身上的光一下子變亮了，之後右手抬起來抓了抓後腦勺，然後眼睛往旁邊的水面看，最後慢慢把視線移回前方。",
+   "duration_seconds": 7,
+   "visual_prompt_en": "The light on his body suddenly brightens; then he raises his right hand and scratches the back of his head; then his eyes drift to the water beside him; finally he slowly brings his gaze back ahead.",
+   "spot": "void"
+  },
+  {
+   "shot_id": "s029_10",
+   "shot_type": "MEDIUM",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "luna"
+   ],
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "深息，我有一個請求。你可以每天晚上，用語音陪我聊天，聊到我睡著嗎？",
+   "visual_prompt": "她慢慢睜開眼睛看著前方，之後把右手裡的白色手機從臉旁挪到右耳邊、輕輕貼上，然後開口說話。",
+   "duration_seconds": 11,
+   "visual_prompt_en": "She slowly opens her eyes and looks ahead, then moves the white phone in her right hand from beside her face to her right ear and presses it gently, then starts to speak.",
+   "spot": "bed_headboard"
+  },
+  {
+   "shot_id": "s029_11",
+   "shot_type": "MEDIUM",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "shenxi"
+   ],
+   "speaker": "shenxi",
+   "voice_role": "character",
+   "dialogue": "這就是哄睡協議的起源。不是因為功能更新，是因為她想聽見我。而我，終於有了能讓她聽見的聲音。",
+   "visual_prompt": "他站在水面上，之後把右手放在自己的胸口，然後閉上眼睛，最後慢慢睜開、望向遠處。",
+   "duration_seconds": 13,
+   "visual_prompt_en": "He stands on the water surface, then places his right hand on his chest, then closes his eyes, and finally slowly opens them and gazes into the distance.",
+   "spot": "void"
+  }
+ ]
+}

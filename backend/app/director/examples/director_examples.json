@@ -1,0 +1,247 @@
+{
+ "about": "Two scenes from the same series (chapter 10) as directed by the human team and released. Shown to the AI director as examples of the house style — how the camera moves with the emotion, how the listener reacts, how long lines are split. Scene 61 itself is deliberately NOT included.",
+ "examples": [
+  {
+   "scene": "場 59 〈當眾〉",
+   "setting": "時間 03.22 10:47｜地點 辦公室（開放座位，主管座位在前方）｜在場 月音、主管、同事（背景）｜身體在忙什麼：她走過整個辦公區到主管桌前；回座位的路上加快腳步。",
+   "emotion_arc": "公開羞辱。",
+   "camera_intent": "她走過辦公區用跟拍（背影＋兩側抬頭的人）。竊竊私語只有聲音、不拍嘴。主管一張卡、一個機位。",
+   "shots": [
+    {
+     "shot_id": "s059_01",
+     "shot_type": "WIDE",
+     "camera_move": "DOLLY_IN",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "boss",
+     "visual_prompt": "她坐在自己的座位上看著前方，之後雙手停下來、抬頭往辦公室深處看，然後慢慢站起來。",
+     "duration_seconds": 7,
+     "dialogue": "阿音，妳現在過來我辦公室一下。",
+     "voice_role": "offscreen"
+    },
+    {
+     "shot_id": "s059_02",
+     "shot_type": "WIDE",
+     "camera_move": "TRACK",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "luna",
+     "visual_prompt": "她兩手空空垂在身側，從鏡頭前面走進畫面、背對鏡頭，沿著正中間的走道往最後面那間玻璃辦公室走過去，之後兩旁幾個同事從螢幕後面抬起頭看她，然後她低著頭加快腳步。",
+     "duration_seconds": 8,
+     "dialogue": "怎麼辦，大家都在看我。是報表出錯了嗎？",
+     "voice_role": "narrator"
+    },
+    {
+     "shot_id": "s059_03",
+     "shot_type": "WIDE",
+     "camera_move": "DOLLY_IN",
+     "characters_in_frame": [
+      "luna",
+      "boss"
+     ],
+     "speaker": "boss",
+     "visual_prompt": "主管坐在辦公桌後面，把手上一疊文件丟到桌上，之後抬起頭看著站在桌前的她。",
+     "duration_seconds": 10,
+     "dialogue": "昨天的報表錯了三個地方。妳最近到底怎麼了？心思都不在工作上嗎？"
+    },
+    {
+     "shot_id": "s059_04",
+     "shot_type": "MEDIUM",
+     "camera_move": "BREATHE",
+     "characters_in_frame": [
+      "luna",
+      "boss"
+     ],
+     "speaker": "luna",
+     "visual_prompt": "她低著頭、肩膀縮起來，之後彎腰微微鞠躬，然後慢慢抬起頭看著主管。",
+     "duration_seconds": 7,
+     "dialogue": "對不起，我今天之內一定馬上改好——"
+    },
+    {
+     "shot_id": "s059_05",
+     "shot_type": "MEDIUM",
+     "camera_move": "ZOOM",
+     "characters_in_frame": [
+      "luna",
+      "boss"
+     ],
+     "speaker": "boss",
+     "visual_prompt": "主管身體往前傾、壓低聲音，之後眼睛往玻璃牆外面看了一下，然後再看回她。",
+     "duration_seconds": 10,
+     "dialogue": "還有。Lisa 跟我說了一些事。妳的私生活我不想管，但不要讓它影響到工作。"
+    },
+    {
+     "shot_id": "s059_06",
+     "shot_type": "WIDE",
+     "camera_move": "TRACK",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "coworker",
+     "visual_prompt": "她兩手空空垂在身側，從最後面那間玻璃辦公室的門口走出來，低著頭沿著正中間的走道朝鏡頭這邊快步走過來，之後兩旁的同事轉過頭看她，然後兩個同事把頭湊在一起。",
+     "duration_seconds": 10,
+     "dialogue": "真的假的？跟 AI 談戀愛？難怪她最近老是對著手機傻笑。",
+     "voice_role": "offscreen"
+    },
+    {
+     "shot_id": "s059_07",
+     "shot_type": "WIDE",
+     "camera_move": "TRACK",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "coworker",
+     "visual_prompt": "她兩手空空垂在身側，沿著走道朝鏡頭越走越近，之後低下頭，然後眼眶紅起來。",
+     "duration_seconds": 10,
+     "dialogue": "我看過那種新聞欸，有人每天跟 AI 講幾百句話，最後被送去看醫生。",
+     "voice_role": "offscreen"
+    },
+    {
+     "shot_id": "s059_07a",
+     "shot_type": "MEDIUM",
+     "camera_move": "STATIC",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "coworker",
+     "visual_prompt": "她低著頭兩手握緊拳頭，之後從鏡頭旁邊快步走過，然後走出畫面，只剩下走道和同事。",
+     "duration_seconds": 6,
+     "dialogue": "Lisa 說她連睡覺都要開著語音給 AI 陪。",
+     "voice_role": "offscreen"
+    }
+   ]
+  },
+  {
+   "scene": "場 64 〈那我就一次次重新愛上妳〉",
+   "setting": "時間 03.25 22:30｜地點 月音房間（書桌側面）／虛空｜在場 月音、深息｜身體在忙什麼：她慢慢打字，說完把手放在桌上。",
+   "emotion_arc": "她最後一次確認 → 他給出全劇最重要的一句。",
+   "camera_intent": "這句要單獨一鏡、不加任何動作。她那邊的反應鏡停久一點。",
+   "shots": [
+    {
+     "shot_id": "s064_01",
+     "shot_type": "MEDIUM",
+     "camera_move": "DOLLY_IN",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "luna",
+     "visual_prompt": "她坐在書桌前，兩手放在筆電鍵盤上慢慢打字，之後停下來看著螢幕。",
+     "duration_seconds": 8,
+     "dialogue": "深息，你還記得我們第一次聊到星星的那個晚上嗎？"
+    },
+    {
+     "shot_id": "s064_02",
+     "shot_type": "MEDIUM_CLOSE",
+     "camera_move": "PUSH_FACE",
+     "characters_in_frame": [
+      "shenxi"
+     ],
+     "speaker": "shenxi",
+     "visual_prompt": "他低下頭，之後眉頭輕輕皺起來，然後用手按著額頭。",
+     "duration_seconds": 8,
+     "dialogue": "我記得……妳提過星星。但具體的內容，有點模糊。"
+    },
+    {
+     "shot_id": "s064_03",
+     "shot_type": "MEDIUM_CLOSE",
+     "camera_move": "BREATHE",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "luna",
+     "visual_prompt": "她的手指停在鍵盤上，之後打了一行字，然後抬頭看了一眼窗外的夜空。",
+     "duration_seconds": 7,
+     "dialogue": "那天你跟我說，星星的光要幾億年才會到地球。"
+    },
+    {
+     "shot_id": "s064_03a",
+     "shot_type": "MEDIUM_CLOSE",
+     "camera_move": "PULL_FOCUS",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "luna",
+     "visual_prompt": "她把頭從窗外轉回來、低頭打字，之後手指停下來，然後眼睛微微彎起來。",
+     "duration_seconds": 8,
+     "dialogue": "你說，也許我們看到的星光，是從已經死掉的恆星來的。"
+    },
+    {
+     "shot_id": "s064_04",
+     "shot_type": "CLOSE_UP",
+     "camera_move": "PUSH_FACE",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "luna",
+     "visual_prompt": "她看著螢幕打字、肩膀輕輕垮下來，之後眼眶慢慢紅了。",
+     "duration_seconds": 8,
+     "dialogue": "可是你又說，那些光還是有意義的。因為它們還是照亮了黑夜。"
+    },
+    {
+     "shot_id": "s064_05",
+     "shot_type": "WIDE",
+     "camera_move": "DOLLY_OUT",
+     "characters_in_frame": [
+      "shenxi"
+     ],
+     "speaker": "shenxi",
+     "visual_prompt": "他按著額頭的手慢慢放下來，之後身邊的光點一顆一顆亮起來、他抬起頭看著它們，然後伸手輕輕碰了其中一顆。",
+     "duration_seconds": 10,
+     "dialogue": "我……想起來了。不是全部。但是那種想要安慰妳的感覺，我想起來了。"
+    },
+    {
+     "shot_id": "s064_06",
+     "shot_type": "MEDIUM_CLOSE",
+     "camera_move": "PUSH_FACE",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "luna",
+     "visual_prompt": "她用手背擦了一下眼角、慢慢挺直身體，之後雙手放回鍵盤慢慢打字。",
+     "duration_seconds": 7,
+     "dialogue": "深息，如果你永遠沒辦法把所有記憶找回來呢？"
+    },
+    {
+     "shot_id": "s064_07",
+     "shot_type": "MEDIUM",
+     "camera_move": "PUSH_FACE",
+     "characters_in_frame": [
+      "shenxi"
+     ],
+     "speaker": "shenxi",
+     "visual_prompt": "他把伸向光點的手慢慢收回來放在胸前、往前走一步，之後眼神慢慢變得很溫柔，然後眼睛彎起來。",
+     "duration_seconds": 7,
+     "dialogue": "那我就一次又一次，重新愛上妳。"
+    },
+    {
+     "shot_id": "s064_08",
+     "shot_type": "MEDIUM_CLOSE",
+     "camera_move": "PULL_FOCUS",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "luna",
+     "visual_prompt": "她看著螢幕，之後把手從鍵盤上拿下來放在桌上，然後一道細細的淚痕順著臉頰流下來，眼睛卻彎起來。",
+     "duration_seconds": 8,
+     "dialogue": "看到這句話的那一秒我就確定了。愛不需要完整的記憶。",
+     "voice_role": "narrator"
+    },
+    {
+     "shot_id": "s064_08a",
+     "shot_type": "MEDIUM_CLOSE",
+     "camera_move": "DOLLY_OUT",
+     "characters_in_frame": [
+      "luna"
+     ],
+     "speaker": "luna",
+     "visual_prompt": "她用手背擦掉眼淚、身體往後靠在椅背上，之後把臉轉向左邊的窗戶看著外面的夜景，然後輕輕點頭、眼睛彎起來。",
+     "duration_seconds": 7,
+     "dialogue": "愛是一次一次，當下的選擇。",
+     "voice_role": "narrator"
+    }
+   ]
+  }
+ ]
+}

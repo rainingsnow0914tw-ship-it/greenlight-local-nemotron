@@ -1,0 +1,388 @@
+# Greenlight — 選角關卡設定
+#
+# 選角關卡：角色圖生成後，使用者可以在便宜的階段反覆更換，
+# 選定之後才進入影片生成。整個流程不需要打字，只按按鈕。
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# 這一關存在的理由：成本階梯
+# ═══════════════════════════════════════════════════════════════════════════
+#
+#   一張角色圖  $0.02      ← 便宜。在這裡試到滿意為止。
+#   一個 8 秒鏡頭  $0.80    ← 40 倍。
+#   一支 3 分鐘的片 $18     ← 900 倍。
+#
+# 角色長相是所有後續鏡頭的地基 —— 一旦開始生影片才發現主角長得不對，
+# 前面所有片段全部報廢。所以正確的做法是把猶豫留在最便宜的階段。
+#
+# 在這裡多花 $0.30 反覆挑，可以避免後面 $18 的重來。
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# 零輸入
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 使用者不能打字說「我要更年輕一點的」。所以重抽不是「再隨機三張」，
+# 而是給他方向按鈕：更年輕／更成熟／換髮型／換氣質……
+#
+# 每個方向對應一段提示詞修飾，系統替他組合。
+#
+# 如果重抽只有「換一批」一個選項，使用者會陷入無方向的隨機輪迴 ——
+# 因為他沒有辦法表達「哪裡不對」。方向按鈕就是讓他不用打字也能表達方向。
+
+version: "0.1"
+
+# ---------------------------------------------------------------------------
+# 每輪產生幾張候選
+# ---------------------------------------------------------------------------
+# 三張是刻意的：
+#   兩張太少，看不出變化的軸線；
+#   五張以上會造成選擇癱瘓，而且每輪成本翻倍。
+#   三張剛好能呈現「保守／中間／大膽」三種詮釋。
+candidates_per_round: 3
+
+# ---------------------------------------------------------------------------
+# 成本護欄
+# ---------------------------------------------------------------------------
+budget:
+  # 每輪成本 = candidates_per_round × Imagen 4 Fast 單價（$0.02）
+  # 三張 = $0.06
+
+  # 不硬性禁止繼續抽，但超過這個輪數就在 UI 上顯示已花費金額。
+  # 理由：這是使用者的錢也是他的創作決定，系統該提供資訊不該替他喊停。
+  soft_warn_after_rounds: 5
+
+  # 這個角色累計花費超過這個數字，改用更醒目的提示。
+  # $0.60 = 10 輪 = 30 張候選圖。抽到這個程度通常代表
+  # 角色描述本身有問題，該回頭調描述而不是繼續抽。
+  hard_warn_usd: 0.60
+
+  # 選定角色後，用 Imagen 4 Standard 重生一張高品質正式版當參考圖。
+  # 只有主要角色值得 —— 配角直接用候選圖。
+  upgrade_principal_to_standard: true
+
+# ---------------------------------------------------------------------------
+# 重抽方向 —— 全部是按鈕，不需要打字
+# ---------------------------------------------------------------------------
+#
+# applies_to:
+#   human      有血有肉的人物
+#   non_human  AI、機器人、動物、擬人化的抽象存在
+#   any        兩者皆可
+#
+# 為什麼要分：非人角色（例如沒有身體的 AI）問「要更年輕還是更成熟」毫無意義，
+# 該問的是「更具象還是更抽象」「更冷還是更溫」。
+# 方向清單必須隨角色類型改變，否則按鈕會變成廢話。
+
+directions:
+
+  - id: reroll
+    label: "換一批"
+    label_en: "Reroll"
+    hint: "同樣的方向，三張全新的詮釋"
+    hint_en: "Same direction, three fresh interpretations"
+    applies_to: any
+    prompt_modifier: ""
+    look_variant: true   # 造型模式（段落造型變體）可用：這個方向保臉
+    order: 0
+
+  # ---- 人物專用 ----
+  - id: younger
+    label: "更年輕"
+    label_en: "Younger"
+    hint: "五官更柔和、皮膚更細緻"
+    hint_en: "Softer features, finer skin"
+    applies_to: human
+    prompt_modifier: "noticeably younger, softer facial features, smoother skin"
+
+  - id: older
+    label: "更成熟"
+    label_en: "Older"
+    hint: "輪廓更明確、眼神更沉穩"
+    hint_en: "Defined contours, calmer gaze"
+    applies_to: human
+    prompt_modifier: "more mature, defined facial structure, calmer gaze"
+
+  - id: softer
+    label: "更柔和"
+    label_en: "Softer"
+    hint: "線條圓潤、氣質親近"
+    hint_en: "Rounded lines, approachable presence"
+    applies_to: human
+    prompt_modifier: "softer rounded features, warm approachable expression"
+
+  - id: sharper
+    label: "更銳利"
+    label_en: "Sharper"
+    hint: "線條俐落、氣場更強"
+    hint_en: "Crisp lines, stronger presence"
+    applies_to: human
+    prompt_modifier: "sharper angular features, striking confident presence"
+
+  # 看過真人版候選後的修正：要有氣質、好看一點，膚色不要太暗 ——
+  # 預設構圖是平光、中性表情（看得清長相），真人風格又寫「自然膚質、35mm 底片」，配上暗綠背景整張偏暗偏素。
+  # 不改預設（拍片要的是真實），多一個方向讓使用者自己選：精緻五官、儀態、造型、明亮透亮的膚色與打光。
+  - id: refined
+    label: "更有氣質"
+    label_en: "More refined"
+    hint: "五官精緻、儀態優雅、造型講究，膚色明亮透亮"
+    hint_en: "Refined features, graceful poise, polished styling, bright luminous skin"
+    applies_to: human
+    prompt_modifier: "graceful refined beauty, delicate well-proportioned features, poised elegant posture, polished tasteful styling, fair luminous complexion, bright soft flattering key light, clean airy background tones"
+
+  - id: change_hair
+    label: "換髮型"
+    label_en: "New hair"
+    hint: "保留五官，只換頭髮"
+    hint_en: "Keep the face, change the hair"
+    applies_to: human
+    prompt_modifier: "same facial features, distinctly different hairstyle and hair length"
+    look_variant: true   # 造型模式（段落造型變體）可用：這個方向保臉
+
+  - id: change_wardrobe
+    label: "換服裝"
+    label_en: "New wardrobe"
+    hint: "保留長相，只換衣服"
+    hint_en: "Keep the look, change the clothes"
+    applies_to: human
+    prompt_modifier: "same face and hair, different outfit and colour palette"
+    look_variant: true   # 造型模式（段落造型變體）可用：這個方向保臉
+
+  # ---- 非人角色專用 ----
+  - id: more_concrete
+    label: "更具象"
+    label_en: "More literal"
+    hint: "更接近可辨認的形體"
+    hint_en: "Closer to a recognisable form"
+    applies_to: non_human
+    prompt_modifier: "more literal embodied form, recognisable silhouette"
+
+  - id: more_abstract
+    label: "更抽象"
+    label_en: "More abstract"
+    hint: "更接近光、流動、能量"
+    hint_en: "Closer to light, flow, energy"
+    applies_to: non_human
+    prompt_modifier: "more abstract, luminous and formless, energy and light rather than solid body"
+
+  - id: warmer
+    label: "更溫暖"
+    label_en: "Warmer"
+    hint: "色溫偏暖、有生命感"
+    hint_en: "Warm tones, a sense of life"
+    applies_to: non_human
+    prompt_modifier: "warm colour temperature, organic living quality"
+
+  - id: colder
+    label: "更冷冽"
+    label_en: "Colder"
+    hint: "色溫偏冷、機械感"
+    hint_en: "Cool tones, machine-like precision"
+    applies_to: non_human
+    prompt_modifier: "cool colour temperature, precise machine-like quality"
+
+# ---------------------------------------------------------------------------
+# 沒有外貌描述時怎麼辦
+# ---------------------------------------------------------------------------
+#
+# 劇本常常不寫角色長相（編劇留給選角），而 AI 角色更是根本沒有外形。
+#
+# 零輸入原則下不能叫使用者打字補。所以做法是：
+# character_designer agent 從劇本裡間接的線索推導出三種詮釋，
+# 每種詮釋一張圖，讓他用按鈕選。
+#
+# 線索來源（依可信度排序，agent 要在 UI 上說明它是根據什麼推的）：
+inference_sources:
+  - id: explicit_description
+    label: "劇本直接寫的外貌"
+    weight: 1.0
+    note: "最可信。例如《數據深淵中的凝視》裡那段 AI 視覺描述。"
+
+  - id: dialogue_reference
+    label: "對話中提到的外表"
+    weight: 0.9
+    note: "例如角色說「今天是亮黃色」，就知道服裝顏色。"
+
+  - id: age_signal
+    label: "年齡線索"
+    weight: 0.7
+    note: "職業、人際關係、生活狀態推得出的年齡帶。"
+
+  - id: role_function
+    label: "劇情功能"
+    weight: 0.5
+    note: "主角／對手／旁觀者，會影響氣質與存在感的詮釋。"
+
+  - id: tone_of_voice
+    label: "說話方式"
+    weight: 0.4
+    note: "用詞、句長、標點習慣透露的性格。"
+
+# 誠實原則：UI 上必須顯示這一張是根據什麼推出來的。
+# 「依劇本明確描述」跟「依說話方式推測」的可信度差很多，
+# 使用者有權知道哪些是他自己寫的、哪些是系統猜的。
+
+# ---------------------------------------------------------------------------
+# 參考圖的構圖規則
+# ---------------------------------------------------------------------------
+#
+# 這張圖不是海報也不是劇照，它是角色一致性的錨點 ——
+# 之後每一個鏡頭都靠它（以及從它固定下來的 appearance_tags）維持同一個人。
+#
+# 所以構圖要求跟「好看」無關，跟「資訊完整」有關：
+#   - 半身、正面偏四分之三：五官與體型都要看得清楚
+#   - 中性表情：帶情緒的臉會讓後續鏡頭的表情被這張圖帶偏
+#   - 均勻打光：戲劇性光影會把臉的一半藏起來，那部分後面就只能靠猜
+#   - 臉不被遮擋：被頭髮／手／道具蓋住的部分，後面每一鏡都只能靠猜
+#
+# 不要求「乾淨背景」：角色一致性主要靠 appearance_tags（英文文字）
+# 放在提示詞最前面維持，背景元素不會被當成角色特徵。
+# 選角是用眼睛選的關卡，帶氛圍光景的候選圖比證件照更容易比較。
+# 如果將來參考圖直接當首幀進入 image-to-video，這條要重新評估。
+#
+# 分工：這裡定義的是構圖與技術規格，由 code 組裝；
+# 角色長什麼樣（appearance_tags）才是 agent 的創意工作。
+# 這樣三張候選圖的差異完全來自角色詮釋本身，不會混進構圖的隨機性 ——
+# 使用者比較的是「這三個人」，不是「這三張照片」。
+reference_shot:
+  # 注入在提示詞最前面（風格前綴之後）
+  #
+  # 避開 "character reference sheet" 這類產業專有名詞：在動畫產業它指的是
+  # 三面圖加表情表的設定集，模型會照著畫出設定集排版而不是單人肖像。
+  # 描述「你要看到什麼」比描述「這是什麼類型的圖」安全。
+  #
+  # 構圖規則必須依角色類型分開：人物版的 "one person / waist up /
+  # head and shoulders" 套到非人角色上會強制模型畫出一個人拿著那個東西，
+  # 因為那是同時滿足兩組要求的唯一答案。非人角色是這個產品重點支援的類型。
+  framing_human_en: >-
+    A single character portrait. Exactly one person in frame, alone,
+    medium shot from the waist up, three-quarter view facing the camera,
+    neutral relaxed expression, soft even lighting on the face,
+    full head and shoulders clearly visible and unobstructed.
+    An atmospheric background that suits this character's world —
+    depth, colour and light are welcome — but the character stays the
+    clear focus and nothing crosses in front of the face.
+
+  framing_non_human_en: >-
+    A single subject study of a non-human entity, centred and filling the frame.
+    The entity itself is the subject — it is not held, worn, operated or
+    accompanied by anyone. The full form is visible within frame, with an
+    atmospheric environment that suits what this entity is —
+    depth, colour and light are welcome — but the entity stays the clear focus.
+
+  # 參考圖的比例：跟著專案的影片比例走（follow_project）。
+  #
+  # 參考圖會送進生成（Veo referenceImages、Omni image input），
+  # 而 Omni 沒有比例參數時會跟著參考圖的方向走 ——
+  # 3:4 直式圖會直接把影片帶成 720×1280 直式。
+  # 另外 3:4 構圖的肖像語意會污染 16:9 影片的構圖（人物擠在中央塞滿直向空間）。
+  #
+  # 「人物佔比太小」用構圖指令解（見 framing 的 centred / filling），
+  # 不是用改畫幅解。
+  aspect_ratio: "follow_project"
+
+  # 1K 就夠 —— 這是拿來看臉決定選哪個的，不是最終成品。
+  # Gemini image 按 token 計費，尺寸直接影響成本。
+  image_size: "1K"
+
+  # 圖片生成之間至少隔幾秒：
+  # 連續打太密會回 429 RESOURCE_EXHAUSTED —— 不是額度用完，
+  # 是每分鐘請求數的配額。事前節流比事後退避划算：退避已經浪費一次往返，
+  # 而且那次失敗仍然算進配額計數。
+  # 這個值視實際配額調整；調小了症狀就是候選圖時不時少一張。
+  # 5.0 在密集使用時（同一分鐘內已經打過十幾張）仍會被擋，所以用 8.0。
+  min_seconds_between_images: 8.0
+
+  # 注入在最後面的負面約束。跟 constraints.yaml 的全域負面約束分開 ——
+  # 那份管的是影片鏡頭，這份管的是參考圖特有的問題。
+  negative_en: >-
+    no text, no watermark, no logo, no multiple subjects, no cropped subject,
+    no extreme close-up, nothing overlapping or obscuring the face,
+    no props unrelated to the character.
+
+  # 非人角色專用的追加負面約束。
+  # 「不要有人」必須明講：模型的預設假設是「角色 = 人」，
+  # 光說「這是一個非人存在」不足以阻止它在旁邊補一個人類。
+  negative_non_human_en: >-
+    no human figure, no person, no face, no hands, no humanoid body,
+    nobody holding or touching the subject.
+
+  # 三張候選要沿著哪條軸線分開。
+  # 不寫「隨機三張」—— 模型會給出三張幾乎一樣的圖，
+  # 使用者看不出差別就等於只有一個選項，這一關就白做了。
+  spread_axis_en: >-
+    The three candidates must differ along a clearly explainable axis
+    (for example reserved / balanced / bold, or literal / stylised / abstract).
+    Each must be a genuinely different reading of the same character,
+    not a minor variation of the same face.
+
+  # 每個角色最多幾個字的英文外貌標籤。
+  # 太長會稀釋提示詞前段的服從度（實測：標籤放最前面有效，
+  # 但一旦超過二十來個字，後面的鏡頭描述就開始被吃掉）。
+  max_appearance_tag_words: 24
+
+# ---------------------------------------------------------------------------
+# 旁白（narrator）
+#
+# 症狀：紀錄片的第三人稱旁白，會突然變成畫面裡的主角開口在講。
+# 旁白不是劇中角色，所以它不在選角表裡，沒有外貌、也不能從選角拿音色。
+# 但它仍然需要一個固定音色 —— 每一鏡獨立生成，不寫的話同一段旁白
+# 在第 1 鏡和第 8 鏡會是兩個人的聲音。
+#
+# 這裡的音色描述是給影片模型用的。旁白改走 Gemini TTS 之後，
+# 真正決定聲音的是 TTS 的 voice 設定，這段只剩備援用途。
+# ---------------------------------------------------------------------------
+narrator:
+  # 預設音色。可以之後做成使用者可選。
+  default_voice_en: >-
+    a calm, measured documentary narrator voice, mid-range and unhurried,
+    with clear articulation and no theatrical emphasis
+  default_voice_label: "沉穩的紀錄片旁白"
+  default_voice_label_en: "Calm documentary narrator"
+  default_voice_label_ja: "落ち着いたドキュメンタリーのナレーション"
+
+  # ── TTS（旁白由 Gemini TTS 合成）──
+  #
+  # 為什麼旁白不讓影片模型生：
+  # 影片模型每一鏡獨立生成，音色帶隨機性 —— 同一段旁白在第 1 鏡和
+  # 第 8 鏡會是兩個人的聲音。TTS 從頭到尾是同一個 voice。
+  # 附帶解掉兩件事：畫面裡的人不可能對嘴（影片根本沒有人聲），
+  # 以及台詞不進影片模型就不會被它的內容審查擋下。
+  tts:
+    # 一行關掉整條 TTS 路徑。
+    # false = 旁白交還給影片模型自己生（靠 voice_role 的提示詞分流控制
+    # 「誰在說話、畫面裡的人不要對嘴」）。
+    # 關掉之後音色會跨鏡漂移、台詞會重新受影片模型的內容審查管 ——
+    # 那是 TTS 路徑本來要解決的兩件事。關之前先知道換回什麼。
+    enabled: true
+    model_id: "gemini-3.1-flash-tts-preview"
+    # 不要用 gemini-2.5-*-tts：Gemini 2.5 全系列已排定退役，
+    # 退役日可能落在使用期間內。
+    voice: "Charon"
+    # 可選的聲音。Gemini TTS 的 prebuilt voice，名字是固定的。
+    voices:
+      - id: "Charon"
+        label: "沉穩男聲"
+        label_en: "Steady male"
+        label_ja: "落ち着いた男声"
+      - id: "Kore"
+        label: "清晰女聲"
+        label_en: "Clear female"
+        label_ja: "明瞭な女声"
+      - id: "Puck"
+        label: "輕快中性"
+        label_en: "Bright neutral"
+        label_ja: "軽快な中性"
+      - id: "Aoede"
+        label: "溫暖女聲"
+        label_en: "Warm female"
+        label_ja: "温かい女声"
+    # 節奏指示：旁白要有抑揚頓挫，不是定速念稿。
+    # 實測有效：同一段文字，平穩念 5.88 秒、加了這類指示變 9.00 秒。
+    # Gemini TTS 不吃 SSML，它讀的是自然語言的表演指示 ——
+    # 所以這裡寫的是「導演對配音員說的話」，不是標記語言。
+    # 混音時環境音壓到幾成。紀錄片慣例是環境音退到背景讓旁白浮上來；
+    # 太低會失去空間感，太高會蓋掉旁白。
+    ambient_volume: 0.35
+    direction: >-
+      你是紀錄片旁白。用沉穩、可信賴的語氣念出這段話，要有抑揚頓挫、
+      不要定速：敘述的部分語速平穩，遇到轉折或關鍵詞前停頓半拍，
+      句子結尾放慢沉下來。情緒克制，不要戲劇化的誇張表演。

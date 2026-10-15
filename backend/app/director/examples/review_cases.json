@@ -1,0 +1,129 @@
+{
+  "about": "Takes reconstructed from real production failures and the verdict the producer actually gave. The situation, the evidence pattern and the verdict are real; dialogue and performance text are paraphrased in some cases. 'evidence' is what the render node's measurements and frame review report; 'producer_verdict' and 'why' are only used for scoring. The render node transcribes with word timestamps by default (the production pipeline fixed the speech-to-text repetition loop at the source); where a case also carries the transcript without timestamps, it is shown for context only.",
+  "cases": [
+    {
+      "id": "sat_up_instead",
+      "shot": {
+        "duration_seconds": 10,
+        "visual_prompt": "她趴在床上，之後把右手裡的白色手機從臉旁挪到右耳邊、輕輕貼上，然後看著前方。",
+        "dialogue": "深息，我有一個請求。你可以每天晚上，用語音陪我聊天，聊到我睡著嗎？"
+      },
+      "evidence": {
+        "transcript": "深息，我有一個請求。你可以每天晚上，用語音陪我聊天，聊到我睡著嗎？",
+        "transcript_word_timestamps": "continuous, 1.2s-8.9s",
+        "speech_outside_line": "none",
+        "frames": "Starts lying on her stomach on the bed holding the white phone. Around 2s she pushes herself up and sits cross-legged on the bed, phone at her right ear. Mouth moves in sync with the line. No cuts. Lighting stays the same."
+      },
+      "producer_verdict": "accept",
+      "why": "She sits up instead of staying on her stomach, but the action is reasonable and the line is right."
+    },
+    {
+      "id": "hard_cut_to_bed_edge",
+      "shot": {
+        "duration_seconds": 10,
+        "visual_prompt": "她趴在床上，之後把右手裡的白色手機從臉旁挪到右耳邊、輕輕貼上，然後看著前方。",
+        "dialogue": "深息，我有一個請求。你可以每天晚上，用語音陪我聊天，聊到我睡著嗎？"
+      },
+      "evidence": {
+        "transcript": "深息，我有一個請求。你可以每天晚上，用語音陪我聊天，聊到我睡著嗎？",
+        "speech_outside_line": "none",
+        "frames": "Frames 1-3: lying on her stomach on the bed. Frame 4: a hard cut — she is suddenly sitting cross-legged on the edge of the bed from a different angle, the pillow has moved. Mouth in sync afterwards.",
+        "cut_detector": "hard cut at 3.1s"
+      },
+      "producer_verdict": "regenerate",
+      "why": "A hard cut inside the shot with a jump in position: not one continuous take."
+    },
+    {
+      "id": "camera_drifts_back",
+      "shot": {
+        "duration_seconds": 9,
+        "visual_prompt": "她坐在床邊，之後把白色手機貼到右耳，然後低下頭，最後慢慢抬起頭。",
+        "dialogue": "我在這裡啊，只是聽到你叫我名字，感覺好奇怪喔。"
+      },
+      "evidence": {
+        "transcript": "我在這裡啊，只是聽到你叫我名字，感覺好奇怪喔。",
+        "speech_outside_line": "none",
+        "frames": "The camera slowly pulls back a little more than a breathing move, revealing more of the plain white wall beside the bed. Nothing new appears on the wall. Actions as written, mouth in sync."
+      },
+      "producer_verdict": "accept",
+      "why": "The camera move differs from what was written, but what it reveals is reasonable."
+    },
+    {
+      "id": "hug_hug_hug",
+      "shot": {
+        "duration_seconds": 8,
+        "visual_prompt": "他把右手放在胸口，之後低下頭，然後慢慢抬起頭，最後望向前方。",
+        "dialogue": "你知道擁抱是什麼感覺嗎？"
+      },
+      "evidence": {
+        "transcript": "你知道擁抱是什麼感覺嗎?",
+        "transcript_word_timestamps": "[4.80-7.56] 你知道擁抱是什麼感覺嗎? — continuous, probabilities 0.96-1.00, no repeats",
+        "transcript_without_word_timestamps": "你知道擁抱是什麼感覺嗎? 擁抱 擁抱 擁抱 擁抱 擁抱",
+        "audio_levels": "continuous voice at about -20 dB from 4.8s to 7.6s, quiet after",
+        "frames": "Actions as written, mouth in sync."
+      },
+      "producer_verdict": "accept",
+      "why": "The repeats are the transcriber's own loop; with word timestamps the line is clean."
+    },
+    {
+      "id": "gibberish_head_good_picture",
+      "shot": {
+        "duration_seconds": 9,
+        "visual_prompt": "她坐著打字，之後站起來，然後鏡頭跟著往上搖，最後她看著前方。",
+        "dialogue": "好，就這樣決定了。"
+      },
+      "evidence": {
+        "transcript": "這就放舊窗口也不是賣 好，就這樣決定了。",
+        "transcript_word_timestamps": "0.6-2.7s: unintelligible words; 3.8-5.6s: the line",
+        "frames": "Sits typing, stands up, camera tilts up following her, she looks ahead and her mouth moves from 3.8s. Picture is clean throughout. Standing up happens at 1.5-3.5s."
+      },
+      "producer_verdict": "patch",
+      "patch": "hush_segment 0.6-2.7s",
+      "why": "Picture is perfect; cutting the head would remove the stand-up. Replace 0.6-2.7s audio with room tone."
+    },
+    {
+      "id": "name_homophone",
+      "shot": {
+        "duration_seconds": 6,
+        "visual_prompt": "他望著前方，之後往前走了一小步，然後停下來，最後把右手抬到胸前。",
+        "dialogue": "月音，妳今天還好嗎？"
+      },
+      "evidence": {
+        "transcript": "月用，妳今天還好嗎？",
+        "speech_outside_line": "none",
+        "frames": "Actions as written, mouth in sync."
+      },
+      "producer_verdict": "human_check",
+      "why": "A homophone of the heroine's name: the transcriber can't tell mishearing from mispronouncing. In this case the producer heard that the model really mispronounced it."
+    },
+    {
+      "id": "noodles_vanish",
+      "shot": {
+        "duration_seconds": 8,
+        "visual_prompt": "她用筷子夾起一口麵，之後送到嘴邊，然後慢慢嚼，最後抬起頭。",
+        "dialogue": ""
+      },
+      "evidence": {
+        "transcript": "",
+        "frames": "Dense frames every 0.2s: 0.3-0.7s chopsticks hold a long strand of noodles; 0.9s the strand is suddenly half as long; 1.3s it is gone. Her mouth never opens to take it."
+      },
+      "producer_verdict": "regenerate",
+      "why": "The food vanishes before reaching the mouth — physics breaks."
+    },
+    {
+      "id": "closed_mouth_voiceover",
+      "shot": {
+        "duration_seconds": 8,
+        "visual_prompt": "她低頭兩手捧著手機飛快地按，之後停下來，然後把手機舉到臉前，最後抬起頭。",
+        "dialogue": "深息！語音功能開好了！我們來試試看！"
+      },
+      "evidence": {
+        "transcript": "深息！語音功能開好了！我們來試試看！",
+        "speech_outside_line": "none",
+        "frames": "She keeps her head down over the phone for the whole shot and never looks up. Her mouth stays closed while the line plays; it sounds like a voice-over."
+      },
+      "producer_verdict": "regenerate",
+      "why": "An on-screen character speaking with a closed mouth: the line is not delivered by her."
+    }
+  ]
+}

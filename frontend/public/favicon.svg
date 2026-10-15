@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!--
+    Greenlight —— 朱印裡的草書 L。
+
+    這是 Logo（components/Icons.tsx 的 <Logo/>）的 favicon 版本，兩個差別：
+      1. 顏色寫死 —— 獨立檔案讀不到 CSS 變數。#C97887 要跟 --seal 一致。
+      2. 沒有水彩濾鏡與飛白 —— feTurbulence 的位移量不隨尺寸縮放，
+         16px 上會把印章邊緣推爛，飛白也會糊成髒點。
+  -->
+  <rect x="26" y="26" width="148" height="148" rx="14" fill="#C97887"/>
+  <ellipse cx="72" cy="56" rx="11" ry="8.5" transform="rotate(-24 72 56)" fill="#EBE2EA"/>
+  <g fill="none" stroke="#EBE2EA" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M70,56 C67,84 65,112 67,134" stroke-width="17"/>
+    <path d="M67,134 C68,149 79,157 96,154" stroke-width="15"/>
+    <path d="M96,154 C114,151 130,146 144,139" stroke-width="11.5"/>
+    <path d="M144,139 C150,136 155,133 160,130" stroke-width="6"/>
+  </g>
+</svg>

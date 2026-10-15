@@ -1,0 +1,619 @@
+# Greenlight — 提示詞約束規則庫
+#
+# 邊界設得好成功率就越高，重點是物理現象要合乎常理。
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# 這個檔案是什麼
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 影片模型不會拒絕不合理的要求，它會照生 —— 生出六根手指、背面朝鏡頭的螢幕、
+# 數量對不上的貓、憑空出現的筆電。這些不是「模型笨」，是提示詞沒有把物理
+# 世界的約束講清楚，模型只好用訓練資料裡的統計慣性去填。
+#
+# 編劇不知道要講這些。他寫「她坐在桌前打電腦」，不會想到要補一句
+# 「螢幕朝向鏡頭」。這正是本產品要降低的門檻 —— 系統替他補上。
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# 為什麼是 config 不是 code
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 這些規則會隨著模型版本改變。Veo 3.1 現在數不準貓，3.2 可能就準了。
+# 寫在 code 裡等於把「當下的模型缺陷」固化進架構。
+#
+# 而且每條規則都帶實證欄位（evidence / expected_lift），
+# 系統跑過真實生成之後，ClickHouse 會回頭校準這些數字 ——
+# 哪條約束真的有用、哪條只是假設，資料會說話。
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# 觸發條件用結構化欄位，不用關鍵字比對
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 用 `"cat" in visual.lower()` 這種字串比對來決定要不要注入約束，
+# 換一份劇本就失效 —— 中文劇本沒有 "cat" 這個字，寫「貓」就抓不到。
+#
+# 這裡改用 Shot schema 的結構化欄位（content_flags / characters_in_frame /
+# shot_type / dialogue）來觸發。這些欄位由 shot_planner agent 填，
+# 是語意判斷不是字面比對，跨語言、跨題材都成立。
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# 新增或修改規則前，先確認它不會跟別條打架
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 每條規則單獨看都合理，但它們是疊在同一段提示詞裡送給模型的。
+# 兩條規則對同一個東西下相反的指示時，模型只能二選一 —— 而且不會報錯，
+# 你只會在成片裡看到一個說不出哪裡怪的畫面。
+#
+# 實例：
+#     screen_facing_camera  說「螢幕內容 clearly legible」
+#     no_text_rendering     說「displays remain blank, blurred. No legible text」
+#
+# 這兩條同時觸發時直接矛盾。更糟的是只觸發前者的鏡頭
+# （有螢幕但沒標 text_in_frame）會單方面聽「要可讀」，
+# 於是模型自己編了畫面內文字 —— 那既不是劇本內容也不是使用者選的語言。
+#
+# 所以動規則之前，用這三個問題檢查：
+#   1. 有沒有別條規則管同一個畫面元素？（螢幕、手、文字、光線、角色）
+#   2. 兩條的 when 條件會不會同時成立？
+#   3. 只觸發其中一條時，另一條想避免的問題會不會反而被放大？
+#
+# 第 3 點最容易漏 —— 規則之間的空隙比重疊更難發現。
+#
+# 通則：「看得見」與「讀得懂」要分開講。構圖需求（面向鏡頭、佔畫面、
+# 有光）跟內容需求（寫什麼字）是兩回事，混在一句話裡就會逼模型編內容。
+# 畫面內的文字一律走「生成時留白、後製再疊」，那時候才控制得住語言。
+
+version: "0.1"
+last_calibrated: null
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 規則本體
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 每條規則的欄位：
+#   id               穩定識別碼。ClickHouse 用這個 join 實測資料。
+#   category         物理分類，見下方 categories 區塊。
+#   when             觸發條件。所有條件都成立才注入（AND）。
+#   inject           注入提示詞的文字（英文 —— Veo 對英文指令的服從度較高）。
+#   principle        給使用者看。見下方「四個文字欄位分別寫給誰」。
+#   advisory         給使用者的行動提醒（選填）。有填才會出現在畫面上。
+#   engineering_note 給開發者看（選填）。不進 API。
+#   evidence         來源與實證強度。
+#   expected_lift    預期成功率提升。會被 ClickHouse 實測校準。
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# 四個文字欄位分別寫給誰（有啟動檢查在守）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+#   principle         → 編劇。這一鏡為什麼需要這條規則，白話兩三句。
+#                       不可以有：日期、鏡頭編號（s001_06）、檔名、
+#                       程式識別字（`no_text_rendering`）、團隊成員稱呼。
+#
+#   advisory          → 編劇，但是要他做一件事。例如「先去選角」
+#                       「文字建議後製疊上去」。沒有行動就不要填。
+#
+#   engineering_note  → 開發者。改動歷程、跟別條規則的互動、
+#                       為什麼這樣寫。它不會出現在畫面上。
+#
+#   evidence          → 實測來源與次數。給校準用。
+#
+# 為什麼要分：
+#   `principle` 若同時當成「使用者說明」與「修改紀錄」，編劇就會在畫面上
+#   讀到鏡頭編號與修改歷程。一個欄位同時面對兩種讀者，寫的人分不清該寫給誰。
+#
+# advisory 不能用 emoji 猜（檢查 principle 裡有沒有特定符號就當成使用者提醒）——
+#   那樣在 principle 補一句工程註記就會意外多一則提醒給使用者。
+#   排版符號不可以當結構訊號。
+#
+# 這四條規矩由 `config_loader._verify_principle_audience()` 在啟動時檢查，
+# 違反的話服務直接起不來 —— 寫在註釋裡的規矩會被跳過，做成門檻就跳不過。
+#
+# expected_lift 的邊界（很重要，不然會重複計算）：
+#
+#   priors.yaml       = 這個鏡頭「先天」有多難
+#                       （鏡別、運鏡、人數、有沒有參考圖這個素材、內容風險）
+#   constraints.yaml  = 「後天」用提示詞工程補救了多少
+#
+#   所以 character_lock 的 lift 只算「把角色標籤注入在提示詞開頭」這個技巧
+#   的價值，不算「有參考圖」本身的價值 —— 後者已經記在
+#   priors.yaml modifiers.has_reference_image (+0.20)。
+#   兩邊都算就會把同一件事的效益灌水兩次。
+
+rules:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 一、幻覺填充 —— 沒說的東西會被模型自己補上
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: exclude_unspecified_props
+    category: hallucination_fill
+    when:
+      always: true
+    inject: >-
+      Only the explicitly described subjects appear as focal elements.
+      No unlisted modern devices, screens, or out-of-context furniture.
+      Background elements must strictly serve the specified setting and
+      period without drawing focus. Characters wear and carry only what
+      is described: no added glasses, hats, jewellery, bags or accessories.
+      The scene is the story world itself, never the set it was filmed on:
+      no film-crew equipment — production cameras, tripods, boom microphones,
+      studio lights — appears in frame. A camera or phone that the story itself
+      puts in a character's hands (taking photos on a trip, filming a memory)
+      is a legitimate prop and is allowed when the shot describes it.
+    principle: >-
+      模型會用訓練資料裡的常見場景填補你沒講到的空白。
+      「她走進玄關」這種句子在訓練資料裡常常伴隨書桌與筆電，
+      模型就會把它們補進來 —— 不只是物件，還包括背景裡多出來的路人、
+      角色自己戴上的眼鏡。沒有明講不要，就等於默許。
+    engineering_note: >-
+      給開發者，不進 API。
+
+      補上「人」：原本只列 props / devices / screens / furniture，
+      **完全沒講人**。實測一個只該有一個多面體的鏡頭，
+      左下冒出一個背對畫面的人頭 —— 模型加一個背對鏡頭的人
+      不違反任何一條約束，因為我們只禁了物件。
+
+      同時補上 background / edges / turned away 三個位置：
+      模型塞人最常見的就是這三種，它自己會覺得「不算主體，應該可以」。
+
+      再補「配件」：實測角色無端戴上了眼鏡。
+      角色標籤裡沒有眼鏡，是模型依「文青女生」的統計慣性自己戴上的。
+      這跟另一條規則互補 —— 配件**不寫進 appearance_tags** 是為了避免鎖死
+      （見 base.yaml），但不寫就必須明講「不要自己加」。
+      **不禁止等於默許**，這條規則的整個道理就在這裡。
+    evidence:
+      source: contextcat_issue9
+      observed_failures: 2
+      note: >-
+        先前實測：進門場景憑空出現一台筆電。
+        本作實測：只有多面體的鏡頭，左下角冒出一個背對鏡頭的人頭。
+    negative_keywords: ["extra props", "unlisted devices", "added accessories", "film-crew equipment"]
+    expected_lift: 0.05
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 二、計數 —— 模型沒有計數能力
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: avoid_explicit_counts
+    category: counting
+    when:
+      has_content_flag: [countable_group]
+    inject: >-
+      Describe quantity qualitatively (a few, several, a group).
+      Do not rely on exact counts being reproduced.
+    principle: >-
+      生成模型是把畫面當整體分佈在生成，不是逐個物件擺放，
+      所以「七隻貓」它給你五隻或九隻都算正常輸出。
+      正確做法是不依賴精確數量 —— 需要精確數量的鏡頭應該改拍法。
+    evidence:
+      source: contextcat_skills_md
+      observed_failures: 1
+      note: "先前實測：寫 seven cats，生出來數量不對。"
+    expected_lift: 0.06
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 三、光學與視線 —— 遮擋、朝向、反射
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: screen_facing_camera
+    category: optics_occlusion
+    when:
+      has_content_flag: [screen_in_frame]
+      character_count_min: 1
+    inject: >-
+      Over-the-shoulder composition: the camera is positioned behind the
+      character, looking past their shoulder directly at the screen.
+      The screen is a real physical device standing naturally — wider than
+      tall for laptops and monitors — and shows soft abstract interface
+      glow (coloured panels, blurred lines, indistinct shapes) with no
+      readable words or characters. The character's shoulder and typing
+      hands remain visible. No floating screens, no holographic panels,
+      no extra displays.
+    principle: >-
+      「同時拍到人臉正面與螢幕正面」在物理上是矛盾的 ——
+      攝影機沒辦法同時站在人的前面與後面。被逼著兩個都給時，
+      模型只能折衷：把螢幕反過來、或憑空生出懸浮的全息螢幕。
+      解法不是更用力地要求，而是換成攝影機的語言：
+      「過肩鏡頭」直接定義機位在人物後方，矛盾消失，
+      螢幕自然朝向觀眾。螢幕內容仍是抽象光暈 ——
+      畫面內的文字交給後製，那時候才控制得住。
+    engineering_note: >-
+      給開發者，不進 API。
+
+      修正：原本寫「its content is clearly legible」，
+      跟 `no_text_rendering` **直接打架**，模型會自己編畫面內文字
+      （日式動畫風就編出假名）。拆成「看得見」與「讀得懂」兩回事。
+
+      大改：原本要求「前四分之三角度、人臉與螢幕同框」——
+      **跨引擎實測（Veo 與 Omni 同一鏡都失敗）證明那個要求本身是空間矛盾**，
+      模型的折衷產物就是反向螢幕與直式懸浮全息板。
+      Gemini Pro 看片診斷後改成攝影機位置語言（over-the-shoulder）：
+      強制定義機位而不是要求兩個互斥的可見性。
+      「No floating screens」是針對 Omni 折衷產物的直接反制。
+
+      代價要知道：過肩構圖看不到人臉正面。人臉表情重要的鏡頭
+      不該同時標 screen_in_frame 當主體 —— 分鏡層要二選一，
+      這條規則只處理「螢幕內容是主角」的鏡頭。
+
+      🔴 這是「規則之間會打架」的頭號案例，改任何一條前先看檔頭那三個檢查問題。
+    evidence:
+      source: contextcat_skills_md
+      observed_failures: 4
+      note: >-
+        先前實測：不加約束就生出螢幕背面（原始公式由 GPT 顧問提供）。
+        本作實測三次：「clearly legible」讓模型編假名；
+        「人臉與螢幕同框」讓 Veo 生出反向螢幕、
+        讓 Omni 生出直式懸浮全息板 —— 兩個引擎、同一個矛盾、同樣失敗。
+    negative_keywords: ["floating screens", "holographic panels"]
+    expected_lift: 0.12
+
+  - id: consistent_light_direction
+    category: optics_lighting
+    when:
+      has_first_frame: true
+    inject: >-
+      Lighting setup, shadow angles, and colour temperature are strictly
+      locked to the provided first frame. No flickering or shifting light
+      sources.
+    principle: >-
+      續接鏡頭時，模型會重新決定光源位置，造成前後兩段光影方向不一致 ——
+      觀眾說不出哪裡怪，但會覺得「不像同一場戲」。
+      光源方向是連戲最基本的物理約束。
+    evidence:
+      source: inferred
+      note: "推論，尚未實測。第一批生成後校準。"
+    expected_lift: 0.07
+
+  - id: reflection_consistency
+    category: optics_lighting
+    when:
+      has_content_flag: [reflective_surface]
+    inject: >-
+      The reflection accurately mirrors the subject's front side and the
+      room behind them. The camera, the crew, and impossible geometries
+      are strictly invisible in any reflective surface.
+    principle: >-
+      鏡面反射需要模型正確推算幾何關係，這是它最弱的能力之一。
+      常見失敗是鏡子裡出現不該存在的東西，或反射的角度不合理。
+    evidence:
+      source: inferred
+    negative_keywords: ["camera visible in reflections"]
+    expected_lift: 0.05
+
+  - id: control_depth_of_field
+    category: optics_lighting
+    when:
+      shot_type: [EXTREME_WIDE, WIDE, MEDIUM]
+    inject: >-
+      Deep focus with a large depth of field: both the subject and the
+      background environment are sharp and clearly defined. Avoid excessive
+      bokeh or artificial background blur.
+    principle: >-
+      模型算力吃緊或背景複雜時，會把背景糊成一片極端散景來掩飾
+      細節生成的不足 —— 整部片看起來像微距鏡頭拍的微縮模型。
+      遠景與中景明確要求深焦，特寫不套（特寫的淺景深是正常語言）。
+    evidence:
+      source: consultant_review
+      note: "Gemini Pro 規則體檢提出，its 對 Veo/Omni 的已知高頻失敗。待實測校準。"
+    negative_keywords: ["excessive bokeh"]
+    expected_lift: 0.06
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 四、解剖與肢體
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: hand_anatomy
+    category: anatomy
+    when:
+      has_content_flag: [hands_visible]
+    inject: >-
+      Hands are anatomically correct with five fingers, natural joint angles,
+      and a plausible grip on any held object.
+    principle: >-
+      手是訓練資料裡姿態變化最多、遮擋最嚴重的部位，
+      模型對「手指數量」沒有硬性約束。
+      這條約束能降低失敗率但不能消除 —— 手部特寫本來就該少用。
+    evidence:
+      source: industry_known
+    expected_lift: 0.08
+
+  - id: asymmetric_feature_side_lock
+    category: anatomy
+    when:
+      character_count_min: 1
+    inject: >-
+      If any character has an asymmetric feature — a medical tube, a scar,
+      an earring, a bag strap, a hair parting — keep it on the exact side
+      stated in their description for the entire shot. Never mirror or flip
+      a character's asymmetric features.
+    principle: >-
+      左右鏡像在模型的訓練分佈裡幾乎等價，不明講的話同一個角色的
+      不對稱特徵（鼻胃管、疤痕、耳環）會在鏡與鏡之間換邊。
+      這條要配合角色描述裡明寫「左／右」才有完整效力 ——
+      描述沒講邊的特徵，模型仍會自己挑一邊。
+    evidence:
+      source: user_report
+      note: "實際觀察：同一角色的鼻胃管在不同鏡頭出現在不同側。待實測校準。"
+    negative_keywords: ["mirrored features"]
+    expected_lift: 0.05
+
+  - id: avoid_limb_crossing
+    category: anatomy
+    when:
+      character_count_min: 2
+      has_content_flag: [fast_action]
+    inject: >-
+      Block the characters with visible physical distance between them,
+      using negative space. No physical contact, no overlapping limbs,
+      no intersecting silhouettes.
+    principle: >-
+      兩個人的肢體在畫面上交疊時，模型分不清哪隻手屬於誰，
+      會生出接在錯誤身體上的手臂。動作越快越嚴重。
+      解法是構圖上讓人物分開，不是叫模型「畫好一點」。
+    evidence:
+      source: industry_known
+    negative_keywords: ["overlapping limbs"]
+    expected_lift: 0.10
+
+  - id: eyeline_control
+    category: anatomy
+    when:
+      character_count_min: 1
+      shot_type: [MEDIUM, MEDIUM_CLOSE, CLOSE_UP]
+    inject: >-
+      The character's eyeline is directed at their scene partner or
+      off-camera at what they are engaging with. They never look directly
+      into the camera lens.
+    principle: >-
+      畫面裡有人臉時，模型很容易讓角色死盯著鏡頭（像在拍廣告），
+      或對話時眼神空洞地望向前方而不是看著對手。
+      明確指定視線方向，戲才像戲。劇本刻意要打破第四面牆時，
+      分鏡的畫面描述會另外寫明。
+    evidence:
+      source: consultant_review
+      note: "Gemini Pro 規則體檢提出。待實測校準。"
+    negative_keywords: ["looking into the camera lens"]
+    expected_lift: 0.07
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 五、流體與重力
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: fluid_physics
+    category: physics_dynamics
+    when:
+      has_content_flag: [water_or_fire]
+    inject: >-
+      Fluid and flame motion follows gravity and inertia consistently
+      throughout the shot. No sudden direction reversal or volume change.
+    principle: >-
+      流體是逐幀生成中最容易失控的元素 —— 水會往上流、火會突然變大又縮小，
+      因為模型沒有物理引擎，只是在猜下一幀長什麼樣。
+      明確要求「遵循重力與慣性」能拉住一部分。
+    evidence:
+      source: industry_known
+    expected_lift: 0.06
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 六、文字
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: no_text_rendering
+    category: text_rendering
+    when:
+      has_content_flag: [text_in_frame]
+    inject: >-
+      Signage and displays remain blank, blurred, or out of focus.
+      No legible text is rendered in frame.
+    principle: >-
+      畫面內的文字幾乎一定會崩 —— 生出來的是像文字的亂碼。
+      所以這一鏡會刻意讓招牌與螢幕留白或失焦。
+    advisory: >-
+      這一鏡需要畫面內出現文字。影片模型寫不出可讀的字，
+      所以我們讓它留白 —— 文字建議在剪接階段用後製疊上去，
+      那時候字型、語言、內容都控制得住。
+    evidence:
+      source: industry_known
+      note: "這條規則的價值不在提升成功率，在於把使用者導向正確的工作流。"
+    negative_keywords: ["readable text", "lettering"]
+    expected_lift: 0.15
+
+  - id: music_not_sung
+    category: text_rendering
+    when:
+      has_dialogue: true
+      has_music_cue: true
+    inject: >-
+      Background music is instrumental only. The spoken lines are plain speech,
+      not sung, and are not set to the melody.
+    principle: >-
+      這一鏡同時有配樂與台詞。「音樂開始」對模型是很強的訊號，
+      它會順手把人聲併進旋律，整段變成在唱歌 ——
+      所以要明講台詞是說出來的，不是唱的。
+    engineering_note: >-
+      給開發者，不進 API。
+
+      這是**兩個各自合理的指示疊在一起**才產生的問題：分鏡師寫
+      「溫暖的鋼琴旋律開始」是對的，角色有台詞也是對的。
+      所以觸發條件必須同時要求兩者 —— 只有音樂沒台詞的鏡頭不需要這句，
+      加了反而是多餘的字，會佔掉疊加額度。
+
+      這是檔頭那三個檢查問題的延伸：規則之間會打架，
+      **提示詞的不同段落之間也會**。
+    evidence:
+      source: greenlight_observed
+      observed_failures: 1
+      note: >-
+        實測：某鏡 music_cue 是「溫暖的木吉他或鋼琴旋律開始」，
+        同鏡有旁白台詞，結果台詞被唱出來。
+    negative_keywords: ["sung dialogue"]
+    expected_lift: 0.04
+
+  - id: no_subtitle_burn_in
+    category: text_rendering
+    when:
+      has_dialogue: true
+    inject: >-
+      No subtitle captions, no text overlays, no watermarks.
+    principle: >-
+      Veo 有時會自己在畫面下方燒進字幕。
+      字幕應該由我們在接片階段以可控的方式加上去 —— 燒進畫面就改不掉了。
+    evidence:
+      source: contextcat_skills_md
+      note: "先前實證：提示詞裡用引號寫台詞會觸發字幕生成，改用冒號格式可避免。"
+    negative_keywords: ["burned-in subtitles", "captions"]
+    expected_lift: 0.04
+
+  - id: dialogue_colon_format
+    category: text_rendering
+    when:
+      has_dialogue: true
+    inject_template: >-
+      {character} says: {line}
+    is_format_rule: true
+    principle: >-
+      用冒號格式（Character says: 台詞）而不是引號格式（A voice says "台詞"）。
+      引號會被模型理解成「要顯示的文字」而觸發字幕生成。
+      這是格式規則不是附加句 —— 它改變台詞的寫法本身。
+    evidence:
+      source: contextcat_skills_md
+      observed_failures: 1
+    expected_lift: 0.05
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 七、時代與場景考據
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: period_accuracy
+    category: period_consistency
+    when:
+      has_content_flag: [period_costume]
+    inject_template: >-
+      Period-accurate to {period}. No anachronistic objects, clothing,
+      hairstyles, or technology.
+    is_format_rule: true
+    principle: >-
+      模型的訓練資料以當代影像為主，時代戲會混進現代物件 ——
+      民國初年的場景裡出現塑膠水瓶、古裝戲裡有現代眼鏡。
+      必須明確指出年代並排除時代錯置。
+    evidence:
+      source: industry_known
+    expected_lift: 0.07
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 八、時間一致性（跨幀穩定）
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: no_morphing
+    category: temporal_stability
+    when:
+      always: true
+    inject: >-
+      Solid subjects and facial features remain stable with no morphing,
+      no warping, no identity drift. Fluid elements (water, flame, smoke)
+      move naturally. Smooth continuous motion.
+    principle: >-
+      逐幀生成時，人臉會緩慢變成另一個人、物體會融化重組。
+      這是影片模型最典型的失敗樣態，明確禁止能降低發生率。
+    evidence:
+      source: contextcat_skills_md
+      note: "先前的做法是在每個提示詞尾端都固定加這句。"
+    negative_keywords: ["morphing", "warping", "identity drift"]
+    expected_lift: 0.06
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 九、角色一致性
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: character_lock
+    category: identity_consistency
+    when:
+      character_count_min: 1
+      has_reference_image: true
+    inject_template: >-
+      {character_tags}. Facial features exactly match the reference image.
+    is_format_rule: true
+    principle: >-
+      你選定的角色外貌會被鎖進提示詞的開頭 ——
+      模型對前段文字的服從度最高，所以同一個人在每一鏡才會長得一樣。
+      沒有這一步，每個鏡頭的主角都是不同的人。
+    engineering_note: >-
+      給開發者，不進 API。
+
+      這是本架構相對於「裸提示詞生成」的主要優勢，值得在 demo 與 README 講。
+      標籤注入位置（開頭）是關鍵，不要為了排版把它移到後面。
+    evidence:
+      source: contextcat_issue9
+      note: "先前實證：不鎖定角色，Imagen 每張圖主角都不同。"
+    # 只有 0.06 是因為「有參考圖」的主要效益（+0.20）已經記在
+    # priors.yaml modifiers.has_reference_image。這裡只算「標籤要放開頭」
+    # 這個提示詞技巧的邊際貢獻。見檔頭的邊界說明。
+    expected_lift: 0.06
+
+  - id: no_reference_warning
+    category: identity_consistency
+    when:
+      character_count_min: 1
+      has_reference_image: false
+    inject: >-
+      Consistent character appearance throughout the shot.
+    principle: >-
+      這個鏡頭有角色，但還沒有選定的角色參考圖。
+      提示詞只能請模型「保持一致」，做不到真正的鎖定。
+    advisory: >-
+      這一鏡的角色還沒選角。沒有參考圖的話，同一個人在不同鏡頭會長得不一樣 ——
+      先去選角關卡把角色定下來，一輪只要幾分錢，比事後重拍便宜得多。
+    evidence:
+      source: inferred
+      note: "這條的存在是為了示警，不是為了修好問題。"
+    # 刻意設為 0：光靠一句「請保持一致」是修不好缺參考圖的。
+    # 假裝它有效等於對使用者說謊 —— 這條規則的價值在 advisory，不在 lift。
+    expected_lift: 0.0
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 分類說明 —— 給 UI 分組顯示用
+# ═══════════════════════════════════════════════════════════════════════════
+categories:
+  hallucination_fill:
+    label: "幻覺填充"
+    description: "沒明講的東西會被模型自己補上"
+  counting:
+    label: "數量"
+    description: "模型沒有計數能力，不要依賴精確數量"
+  optics_occlusion:
+    label: "視線與遮擋"
+    description: "誰擋住誰、朝向哪裡，是幾何問題"
+  optics_lighting:
+    label: "光線與反射"
+    description: "光源方向、色溫、鏡面幾何"
+  anatomy:
+    label: "解剖與肢體"
+    description: "手指、關節、肢體交疊"
+  physics_dynamics:
+    label: "流體與重力"
+    description: "水、火、掉落 —— 模型沒有物理引擎"
+  text_rendering:
+    label: "畫面內文字"
+    description: "幾乎必崩，正確做法是留白後製"
+  period_consistency:
+    label: "時代考據"
+    description: "訓練資料以當代影像為主，時代戲容易穿幫"
+  temporal_stability:
+    label: "跨幀穩定"
+    description: "變形、漂移、身份飄移"
+  identity_consistency:
+    label: "角色一致性"
+    description: "同一個角色在不同鏡頭要長得一樣"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 疊加上限
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 約束不是加越多越好。提示詞過長時，模型對後段指令的服從度會下降，
+# 反而稀釋掉真正重要的約束。
+#
+# 所以：按 expected_lift 排序，只取前 N 條；
+# 且所有約束的加總提升要打折（邊際效益遞減）。
+stacking:
+  max_rules_per_shot: 4
+  diminishing_factor: 0.75   # 第 n 條規則的實際效果 = lift × 0.75^(n-1)
+  max_total_lift: 0.35       # 約束再多也不可能讓成功率提升超過這個數字

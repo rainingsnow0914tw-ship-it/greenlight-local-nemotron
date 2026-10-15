@@ -1,0 +1,60 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 環境變數 —— 絕對不能進 repo
+.env
+.env.local
+*.key
+*-service-account.json
+
+# 生成產物（影片與圖片很大，放 GCS 不放 git）
+outputs/
+*.mp4
+*.webm
+
+# 前端
+node_modules/
+dist/
+*.tsbuildinfo
+
+# 原子寫入的中途檔（project_store 用 tmp+rename，偶爾會留殘骸）
+*.tmp
+
+# 編輯器 / 系統
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+deployment/env.cloudrun.yaml
+# demo service 的 env（同樣含專案設定，不進版控）
+deployment/env.demo.yaml
+# 任何 env 備份也不進版控（.bak 容易漏網）
+deployment/env.*.bak
+deployment/env.cloudrun.yaml.bak
+
+# 前端編譯產物（由 frontend/dist 複製，不進版控）
+backend/app/static/
+
+# 打包產物（安裝檔、暫存）
+dist_app/
+build_tmp/
+*.spec
+
+# 私人筆記與交接手冊（過程紀錄不進 repo）
+_private/
+
+# 評審影片：只收腳本，素材與成品太大
+submission/demo-video/.venv-rec/
+submission/demo-video/成片/
+submission/demo-video/錄影/
+submission/demo-video/旁白/*.wav
+submission/demo-video/旁白/_join/
+submission/demo-video/旁白/_原檔備份/
+submission/demo-video/旁白/*.mp4
+submission/demo-video/旁白/*.log
+submission/demo-video/旁白/*.jpg

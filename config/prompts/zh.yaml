@@ -1,0 +1,43 @@
+# Greenlight — 中文 語言檔
+#
+# 這個檔只放語言差異：術語慣例、寫作風格、UI 文案。
+# 分鏡與解析的規則在 base.yaml，只有一份 —— 改一次三種語言都生效。
+#
+# 為什麼術語慣例不能共用：日文的「引き／なめ」跟中文的「過肩／泛焦」
+# 不是翻譯關係，是各自語言的現場詞彙。這部分才真的需要分開。
+#
+# 編輯這個檔不會影響其他語言。
+
+meta:
+  code: zh
+  name: 中文
+  name_en: Chinese
+  writing_conventions: 影視術語用華語圈現場慣用的說法（遠景／中景／特寫／推軌／搖鏡／定鏡）。 情緒不要用形容詞堆疊，用具體的物件、光線、動作去承載。
+agents:
+  prompt_writer:
+    style_guidance: 中文的意境詞可以直接用（蕭索、欲言又止、一室寂靜、光影斑駁）， 不必翻成英文再磨掉一層。但仍要搭配具體的物件與動作， 不能只有情緒沒有畫面。
+    negative_suffix: 不要浮水印、不要商標、不要畫面內字幕。
+ui:
+  app_name: Greenlight
+  tagline: 從劇本，到畫面
+  stages:
+    parsed: 讀本
+    look_chosen: 定調
+    tier_chosen: 定案
+    cast_locked: 選角
+    prompts_ready: 提示詞
+    test_shot_passed: 試拍
+    generating: 開拍
+    assembled: 成片
+  actions:
+    next: 下一步
+    back: 上一步
+    reroll: 換一批
+    select: 就這個
+    export: 匯出
+  labels:
+    estimated_cost: 預估花費
+    success_rate: 一次過關率
+    prior_only: 先驗估計
+    measured: 實測統計
+    risk_shots: 風險鏡頭

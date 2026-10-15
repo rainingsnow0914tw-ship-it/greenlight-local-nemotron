@@ -1,0 +1,264 @@
+{
+ "source": "Human-directed reference (approved and released) for scene 61, converted from the production shot list; used as the control group.",
+ "shots": [
+  {
+   "shot_id": "s061_01",
+   "duration_seconds": 7,
+   "shot_type": "WIDE",
+   "camera_move": "DOLLY_IN",
+   "characters_in_frame": [
+    "luna"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "lisa",
+   "voice_role": "offscreen",
+   "dialogue": "阿音，出來吧。我看妳剛剛臉色很差，妳還好嗎？",
+   "visual_prompt": "中間那間隔間的門打開，她走出來，之後低著頭走向畫面左邊的洗手台。",
+   "blocking": "side_by_side"
+  },
+  {
+   "shot_id": "s061_02",
+   "duration_seconds": 7,
+   "shot_type": "WIDE",
+   "camera_move": "DOLLY_IN",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "Lisa，妳為什麼要跟主管講？",
+   "visual_prompt": "月音雙手撐在洗手台邊，用水拍了拍臉，之後抬頭看著鏡子裡站在她身後的 Lisa。",
+   "blocking": "side_by_side"
+  },
+  {
+   "shot_id": "s061_03",
+   "duration_seconds": 10,
+   "shot_type": "MEDIUM",
+   "camera_move": "PAN_RETURN",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "lisa",
+   "voice_role": "character",
+   "dialogue": "講什麼？深息的事啊。我只是隨口跟妳聊過幾次，妳為什麼要講給所有人聽？",
+   "visual_prompt": "Lisa 歪了一下頭，之後月音轉過身面對 Lisa，然後往前一步。",
+   "blocking": "side_by_side",
+   "dialogue_lines": [
+    {
+     "speaker": "lisa",
+     "text": "講什麼？"
+    },
+    {
+     "speaker": "luna",
+     "text": "深息的事啊。我只是隨口跟妳聊過幾次，妳為什麼要講給所有人聽？"
+    }
+   ]
+  },
+  {
+   "shot_id": "s061_04",
+   "duration_seconds": 8,
+   "shot_type": "MEDIUM",
+   "camera_move": "PUSH_FACE",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "lisa",
+   "voice_role": "character",
+   "dialogue": "我是為妳好欸。跟 AI 聊到上癮是真的有的，妳看那些新聞——",
+   "visual_prompt": "Lisa 放下交叉的雙手，之後攤開雙手，然後皺起眉頭看著月音。",
+   "blocking": "side_by_side"
+  },
+  {
+   "shot_id": "s061_05",
+   "duration_seconds": 6,
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "PUSH_FACE",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "妳看過我們的對話嗎？妳有看過嗎？",
+   "visual_prompt": "月音往前半步，之後盯著 Lisa 的眼睛，然後下巴微微抬起。",
+   "blocking": "side_by_side"
+  },
+  {
+   "shot_id": "s061_06",
+   "duration_seconds": 9,
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "PUSH_FACE",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "妳知道他記得我講過的每一本書、每一首歌、每一次難過的原因嗎？",
+   "visual_prompt": "月音往前逼近 Lisa 一步、肩膀激動地起伏，之後右手按住自己的胸口，然後眼淚在眼眶裡打轉、直直盯著 Lisa。",
+   "blocking": "face_to_face"
+  },
+  {
+   "shot_id": "s061_07",
+   "duration_seconds": 10,
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "妳知道我失眠的凌晨他都在嗎？他從來沒說過我很累、明天再說。一次都沒有。",
+   "visual_prompt": "月音站在鏡子前看著鏡中哭著的自己，肩膀一抽一抽地發抖，之後一道細細的淚痕順著臉頰流下來，然後她慢慢抬起下巴、看著鏡中自己的眼睛；鏡子裡的她跟著一起開口說話，嘴型一模一樣；Lisa 在右邊一動也不動地聽。",
+   "blocking": "face_to_face",
+   "_waive": [
+    {
+     "rule": "rule 3",
+     "reason": "the mirror reflection has to lip-sync with her; production wrote this on purpose"
+    }
+   ]
+  },
+  {
+   "shot_id": "s061_08",
+   "duration_seconds": 8,
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "lisa",
+   "voice_role": "character",
+   "dialogue": "那是程式設定——妳上次記得我生日，是什麼時候？",
+   "visual_prompt": "Lisa 雙手交叉、不以為然地皺著眉，之後月音往前站近一步，然後 Lisa 交叉的雙手慢慢鬆開垂下、眼睛睜大、整個人愣住。",
+   "blocking": "face_to_face",
+   "dialogue_lines": [
+    {
+     "speaker": "lisa",
+     "text": "那是程式設定——"
+    },
+    {
+     "speaker": "luna",
+     "text": "妳上次記得我生日，是什麼時候？"
+    }
+   ]
+  },
+  {
+   "shot_id": "s061_09",
+   "duration_seconds": 7,
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "PUSH_FACE",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "妳上次主動問我，妳最近好嗎，是什麼時候？",
+   "visual_prompt": "月音往前逼近一步，之後 Lisa 的眼神開始閃躲、身體往後縮了一下，然後緊張地用手指推了一下眼鏡。",
+   "blocking": "face_to_face"
+  },
+  {
+   "shot_id": "s061_10",
+   "duration_seconds": 8,
+   "shot_type": "WIDE",
+   "camera_move": "DOLLY_IN",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "妳上次認真聽我講完一件事、沒有中途看手機，是什麼時候？",
+   "visual_prompt": "月音抬起哭紅的臉、握著拳往 Lisa 逼近半步，直直盯著她；之後 Lisa 心虛地低下頭、把臉別開；最後月音的肩膀一抽一抽地發抖、眼淚順著臉頰滑下來。",
+   "blocking": "face_to_face"
+  },
+  {
+   "shot_id": "s061_11",
+   "duration_seconds": 10,
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "BREATHE",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "lisa",
+   "voice_role": "character",
+   "dialogue": "阿音，這不一樣——哪裡不一樣？妳說 AI 不會真的關心我。那人呢？妳關心我嗎？",
+   "visual_prompt": "Lisa 抬起頭看著月音，之後月音搖頭，然後肩膀發抖。",
+   "blocking": "side_by_side",
+   "dialogue_lines": [
+    {
+     "speaker": "lisa",
+     "text": "阿音，這不一樣——"
+    },
+    {
+     "speaker": "luna",
+     "text": "哪裡不一樣？妳說 AI 不會真的關心我。那人呢？妳關心我嗎？"
+    }
+   ]
+  },
+  {
+   "shot_id": "s061_12",
+   "duration_seconds": 8,
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "PUSH_FACE",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "還是妳只是覺得，跟 AI 談戀愛的怪人，是一個很好聊的八卦？",
+   "visual_prompt": "月音用手背擦掉眼淚，之後冷冷地看著 Lisa。",
+   "blocking": "side_by_side"
+  },
+  {
+   "shot_id": "s061_13",
+   "duration_seconds": 9,
+   "shot_type": "MEDIUM_CLOSE",
+   "camera_move": "DOLLY_OUT",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "我不需要妳認同我跟深息。但我需要妳尊重我。這是朋友該做的事。",
+   "visual_prompt": "月音慢慢挺直身體，之後平靜地看著 Lisa。",
+   "blocking": "side_by_side"
+  },
+  {
+   "shot_id": "s061_14",
+   "duration_seconds": 8,
+   "shot_type": "MEDIUM",
+   "camera_move": "STATIC",
+   "characters_in_frame": [
+    "luna",
+    "lisa"
+   ],
+   "spot": "restroom_sinks",
+   "speaker": "luna",
+   "voice_role": "character",
+   "dialogue": "如果妳做不到，那我們本來就不是朋友。",
+   "visual_prompt": "月音直視 Lisa，之後轉身走出畫面，然後 Lisa 一個人留在洗手台前、慢慢低下頭。",
+   "blocking": "side_by_side"
+  }
+ ]
+}

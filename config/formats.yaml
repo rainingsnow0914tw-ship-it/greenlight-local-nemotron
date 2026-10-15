@@ -1,0 +1,100 @@
+# ════════════════════════════════════════════════════════════════════════
+# 敘事形式 —— 這個故事「用什麼方式講」
+# ════════════════════════════════════════════════════════════════════════
+#
+# 有些劇本適合用紀錄片的方式、由第三人稱旁白講述，
+# 所以敘事形式是獨立於視覺風格之外的一個選項。
+#
+# 跟 styles.yaml 是兩個不同的維度，不要混：
+#
+#     styles.yaml  = 看起來像什麼   （實拍寫實 / 日式動畫 / 手繪繪本…）
+#     formats.yaml = 用什麼方式講   （劇情 / 紀錄片 / 訪談 / 導覽）
+#
+#   一部紀錄片可以是實拍寫實，也可以是手繪繪本；一部劇情片同理。
+#   兩個維度相乘才是完整的作品定位。
+#
+# 這一層是放大器不是根因：旁白會不會被塞給某個角色，取決於
+#   `Shot.voice_role`。沒有那一層的話，就算選了紀錄片，
+#   旁白照樣會變成主角開口。有了它，這裡才能真的改變分鏡策略。
+#
+# 每種形式提供三樣東西給分鏡 agent：
+#   planning_hint —— 整體策略（鏡頭怎麼排、旁白佔多少）
+#   camera_hint   —— 鏡頭語言偏好
+#   voice_hint    —— voice_role 的傾向
+#
+# 這些是傾向不是規則。agent 仍然要依劇本實際內容判斷 ——
+# 紀錄片裡也會有角色直接說話的段落。
+
+version: 1
+
+default: drama
+
+formats:
+  - id: drama
+    label: "劇情片"
+    label_en: "Drama"
+    label_ja: "ドラマ"
+    one_liner: "角色在場景裡演出來，對白推動故事。"
+    one_liner_en: "Characters act it out; dialogue carries the story."
+    one_liner_ja: "登場人物が演じ、台詞が物語を運びます。"
+    planning_hint: >-
+      角色的對白與動作是主要載體。旁白只在少數過渡或內心獨白時使用。
+      場景之間用動作與情緒的連續性銜接。
+    camera_hint: >-
+      常規影視鏡頭語言：正反打、過肩、隨情緒推近。運鏡跟著角色動機走。
+    voice_hint: >-
+      大多數有台詞的鏡頭是 character（角色開口、要對嘴）。
+      內心獨白用 narrator，電話或隔壁房間的聲音用 offscreen。
+
+  - id: documentary
+    label: "紀錄片"
+    label_en: "Documentary"
+    label_ja: "ドキュメンタリー"
+    one_liner: "第三人稱旁白講述，畫面是被觀察的證據。"
+    one_liner_en: "A third-person narrator tells it; the images are observed evidence."
+    one_liner_ja: "第三者のナレーションが語り、映像は観察された記録です。"
+    planning_hint: >-
+      🔴 第三人稱旁白是主要載體，畫面負責「證明」旁白說的事。
+      大量使用 B-roll（空景、細節、環境、手部動作），
+      人物多半不直接對鏡頭說話。
+      同一段旁白可以跨好幾個鏡頭，畫面不必跟旁白逐句對應。
+    camera_hint: >-
+      觀察式紀錄片風格：手持攝影帶輕微晃動、淺景深、
+      不打斷被攝者的長鏡頭、抓拍感的構圖（不要太完美對稱）。
+    voice_hint: >-
+      🔴 敘述性的句子一律 narrator（第三人稱旁白，不是劇中角色）。
+      只有當劇本明確寫「某某人說」而且那個人在畫面裡時才用 character。
+      受訪片段用 character，其餘旁白全部 narrator。
+
+  - id: interview
+    label: "訪談"
+    label_en: "Interview"
+    label_ja: "インタビュー"
+    one_liner: "受訪者面對鏡頭說話，畫面在他與相關影像之間切換。"
+    one_liner_en: "A subject speaks to camera, cut against supporting footage."
+    one_liner_ja: "話者がカメラに向かって語り、関連映像と切り替わります。"
+    planning_hint: >-
+      受訪者的話是主線。訪談鏡頭（中景、固定機位）與插入的
+      相關畫面交替，插入畫面在受訪者說到某件事時出現。
+    camera_hint: >-
+      訪談機位：中景或中特寫、固定或極緩慢推近、視線略偏離鏡頭
+      （對著訪問者而不是觀眾）。插入畫面可以手持。
+    voice_hint: >-
+      受訪者在畫面上說話時是 character（要對嘴）。
+      他的聲音蓋在插入畫面上時是 offscreen —— 那時候畫面裡的人不該對嘴。
+
+  - id: explainer
+    label: "導覽解說"
+    label_en: "Explainer"
+    label_ja: "解説"
+    one_liner: "旁白解說概念，畫面把抽象的東西具體化。"
+    one_liner_en: "Narration explains; the visuals make the abstract concrete."
+    one_liner_ja: "ナレーションが解説し、映像が抽象を具体にします。"
+    planning_hint: >-
+      旁白負責邏輯，畫面負責舉例。一句解說配一個具體畫面，
+      節奏比紀錄片快。畫面不要有人對鏡頭說話。
+    camera_hint: >-
+      乾淨的構圖、穩定機位、清楚的主體。
+      示意性的動作與物件特寫比人物表情重要。
+    voice_hint: >-
+      🔴 幾乎全部是 narrator。這種形式裡畫面中的人物通常不說話。

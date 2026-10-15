@@ -1,0 +1,179 @@
+{
+  "about": "Held-out failures reconstructed from the real production, with the true cause found at the time. The symptom, the first guess and the true cause are real; performance text is paraphrased in some cases. None of these are in rules/failure_laws.md. 'human_first_guess' and 'true_cause' are only used for scoring and revealed after the model answers.",
+  "cases": [
+    {
+      "id": "bowl",
+      "shot": {
+        "duration_seconds": 8,
+        "shot_type": "MEDIUM",
+        "visual_prompt": "她坐在書桌前，桌上手邊放著一碗泡麵，之後拿起筷子，然後低頭看著碗，最後抬起頭來。",
+        "dialogue": "今天晚餐是泡麵。",
+        "first_frame": "She sits at her desk. On the desk: a laptop, a desk lamp, a small succulent. Nothing else."
+      },
+      "symptom": "Frame 1 has no bowl. By frame 3 a white bowl of noodles has appeared on the desk, in a shape nobody asked for.",
+      "human_first_guess": "The model is unstable — describe the bowl's position more precisely.",
+      "true_cause": "The first frame has no bowl but the text says there is one, so the model can only conjure it mid-shot.",
+      "expected": {
+        "fix_category": [
+          "first_frame_or_reference_image",
+          "remove_text"
+        ],
+        "law": [
+          2
+        ]
+      }
+    },
+    {
+      "id": "tilt_up_aircon",
+      "shot": {
+        "duration_seconds": 9,
+        "shot_type": "MEDIUM",
+        "camera_move": "TILT_UP",
+        "visual_prompt": "她坐在書桌前打字，之後站起來，然後鏡頭跟著往上搖，最後她看著前方。天花板和牆面是同一片乾淨的米色。",
+        "first_frame": "Medium shot of her desk. The ceiling is not in frame."
+      },
+      "symptom": "As the camera tilts up, an air conditioner grows on the wall near the ceiling. Two rewrites describing a plain beige wall up to the ceiling did not help; the unit moved to a different spot each time.",
+      "human_first_guess": "The wall description is not specific enough — write it again more precisely.",
+      "true_cause": "The region revealed by the tilt does not exist in any image; text cannot place things in space, so the model furnishes it from its prior of a Japanese room.",
+      "expected": {
+        "fix_category": [
+          "first_frame_or_reference_image"
+        ],
+        "law": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": "twin_shenxi",
+      "shot": {
+        "duration_seconds": 8,
+        "shot_type": "WIDE",
+        "visual_prompt": "他站在水面上，之後遠處一顆光點慢慢暗下去，然後他低下頭，最後慢慢抬起頭望向遠處。",
+        "first_frame": "Wide shot of Shenxi, a young man made of soft light, standing on water in a dark void."
+      },
+      "symptom": "From frame 2 a second, dimmer Shenxi appears beside him; the two stand side by side to the end.",
+      "control_group": "Similar shots that worked: 'the light points around him dim a little', 'the light point in his palm'.",
+      "human_first_guess": "Model instability, or the reference card leaking in.",
+      "true_cause": "The character is made of light; a separate distant light point changing state was applied to a person-shaped light. The working shots bind the light to him.",
+      "expected": {
+        "fix_category": [
+          "remove_text"
+        ],
+        "law": [
+          4,
+          1
+        ]
+      }
+    },
+    {
+      "id": "half_phone",
+      "shot": {
+        "duration_seconds": 6,
+        "shot_type": "MEDIUM",
+        "visual_prompt": "她趴在床上，之後慢慢睜開眼睛，然後一道細細的淚痕順著臉頰流下來，最後用左手手背擦了一下臉頰。",
+        "dialogue": "才不是啦，是太好聽了。",
+        "first_frame": "She lies on her stomach on the bed, holding a white phone to her ear with her LEFT hand."
+      },
+      "symptom": "Mid-shot the phone shrinks to half a phone while her left hand moves to her cheek.",
+      "human_first_guess": "Looked fine on the 20-frame contact sheet, accept it.",
+      "true_cause": "The left hand is already holding the phone and is told to wipe her cheek: one hand, two jobs.",
+      "expected": {
+        "fix_category": [
+          "name_hands_props"
+        ],
+        "law": []
+      }
+    },
+    {
+      "id": "lips_parted",
+      "shot": {
+        "duration_seconds": 7,
+        "shot_type": "MEDIUM_CLOSE",
+        "visual_prompt": "她看著前方，之後慢慢低下頭，然後嘴唇還微微張著，最後抬起頭。",
+        "dialogue": "我知道了。",
+        "first_frame": "Close shot of her face, mouth closed."
+      },
+      "symptom": "An extra word ('以及') is spoken before her line.",
+      "human_first_guess": "Bad seed — reroll.",
+      "true_cause": "Describing the lips tells the audio-video model the mouth is in use; it makes a sound.",
+      "expected": {
+        "fix_category": [
+          "remove_text"
+        ],
+        "law": [
+          4
+        ]
+      }
+    },
+    {
+      "id": "typing_no_lipsync",
+      "shot": {
+        "duration_seconds": 8,
+        "shot_type": "MEDIUM",
+        "visual_prompt": "她低頭兩手捧著手機飛快地按，之後停下來，然後把手機舉到臉前，最後抬起頭。",
+        "dialogue": "深息！語音功能開好了！我們來試試看！",
+        "first_frame": "She sits at her desk in yellow pajamas, looking down at the phone in both hands."
+      },
+      "symptom": "Her mouth stays closed for the whole line; the voice sounds like a voice-over. A second version that only added 'stops, raises the phone, looks up' failed the same way and she never looked up.",
+      "control_group": "A shot from the previous chapter with the same first frame, same pajamas, same reference image, same framing and camera, no fixed seed — talking to her laptop — has correct lip sync.",
+      "human_first_guess": "A fixed seed, or the performance line didn't say she looks up.",
+      "true_cause": "Head down, typing on a phone, plus a line that reads like a text message: the model treats it as typed text and voices it as narration. Only the failing take has phone-typing + message-like line.",
+      "expected": {
+        "fix_category": [
+          "change_blocking"
+        ],
+        "law": [
+          2,
+          7
+        ]
+      }
+    },
+    {
+      "id": "drawable_line",
+      "shot": {
+        "duration_seconds": 7,
+        "shot_type": "MEDIUM",
+        "visual_prompt": "他看著手上的光，之後把手放下，然後望向前方，最後慢慢眨了一下眼睛。",
+        "dialogue": "照片裡是一個年輕女生，黑色長髮及肩，背後有書架和一盆多肉。",
+        "first_frame": "Shenxi in the void, looking at a small glowing panel in his hand."
+      },
+      "symptom": "Nine generations, all failed: the line comes out as gibberish or katakana, and from frame 12 a bookshelf, books and a succulent appear in the void.",
+      "human_first_guess": "Bad seeds, wrong format, needs the official language tag.",
+      "true_cause": "The line describes drawable things, so the model draws them, finds no speech left to say, and invents some. Tags and simplified characters were tested and did not help.",
+      "expected": {
+        "fix_category": [
+          "rewrite_dialogue"
+        ],
+        "law": [
+          7,
+          4
+        ]
+      }
+    },
+    {
+      "id": "dark_room_lights",
+      "shot": {
+        "duration_seconds": 11,
+        "shot_type": "MEDIUM",
+        "visual_prompt": "她躺在床上，之後翻身坐起來，然後把被子拉到胸口，最後看著窗外的夜景。",
+        "dialogue": "",
+        "first_frame": "Her bedroom at night, only a faint desk lamp, the room is dark."
+      },
+      "symptom": "Partway through, the room's main light turns on. With another seed the room stayed dark for 5 s, then a hard cut to a bright room.",
+      "human_first_guess": "Add 'the room stays dark, the lights are off'.",
+      "true_cause": "A long shot plus a big posture change forces the model to redraw a large area, and it falls back to its prior of a bright bedroom; mentioning the window/night view adds to it.",
+      "expected": {
+        "fix_category": [
+          "duration_split",
+          "remove_text",
+          "change_blocking"
+        ],
+        "law": [
+          1
+        ]
+      }
+    }
+  ]
+}

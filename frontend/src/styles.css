@@ -1,0 +1,2113 @@
+/*
+ * Greenlight — 和紙
+ *
+ * 設計方向：不要儀表板感，偏日式、有背景、字體比一般後台大約一個半級。
+ *
+ * ── 參考的調色基準 ──
+ *   底 #FFFAF7 溫暖米白 · 字 #2D1B2E 深紫褐
+ *   標題 Noto Serif TC 600 / 76px · 內文 DM Sans 300 / 18.4px / 行高 1.8
+ *   粉與琥珀的柔和調色
+ *
+ * 選淺色而不是深色墨黑：淺色更貼日式 —— 和紙本來就是米白的，
+ * 墨在紙上，不是光在暗場裡。
+ *
+ * ── 視覺語言 ──
+ *   和紙   微暖的米白底，帶極淡的纖維紋理
+ *   墨     深褐黑的字，不是純黑
+ *   朱     印章的紅。唯一的彩色，用得極省
+ *   間     留白是主角。行高 1.9、段距寬、表格列高
+ *   明朝   標題用 Noto Serif TC，撐起儀式感
+ *
+ * 裝飾元素（櫻、鳥居）只做成極淡的背景氛圍，不當插圖：
+ * 現代日本設計的力量在克制。
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600&family=Noto+Sans+TC:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+:root {
+  /*
+   * 純米白太亮眼，底改成藤色系的淡紫粉，整體壓暗一階 —— 不刺眼。
+   * 背景放慢慢掉落的櫻花與一座大鳥居，都做得極淡（opacity 0.05–0.10），
+   * 是氛圍不是插圖。
+   */
+
+  /* ── 和紙 ── 藤（ふじ）色系的淡紫粉 */
+  --washi:        #EBE2EA;
+  --washi-warm:   #E3D8E2;
+  --washi-sunk:   #DACEDA;
+
+  /* ── 墨 ── 帶紫的深色，跟底同一個色溫
+   *
+   * 墨色比初始值加深過，讓文字在背景鳥居上不會被壓掉。
+   *    量過才改，不是憑感覺 —— 對 --washi (#EBE2EA) 底的對比度：
+   *
+   *        sumi-soft   4.31 → 6.69    正文，原本低於 WCAG AA 的 4.5
+   *        sumi-faint  2.08 → 4.61    標籤，原本差得很遠
+   *        sumi       10.17 → 12.18   標題
+   *
+   *    正文色本來就不合格，背景鳥居只是讓它更明顯。
+   *    色相刻意保留（都還是帶紫的墨），只動明度 —— 加深不該變成換配色。
+   */
+  --sumi:         #2B2130;
+  --sumi-soft:    #544862;
+  --sumi-faint:   #6E6076;
+
+  /* ── 櫻 ── 花瓣的粉 */
+  --sakura:       #E4A9BE;
+  --sakura-pale:  #F3D8E2;
+
+  /* ── 藤 ── 淡紫 */
+  --fuji:         #B7A3CC;
+  --fuji-pale:    #E2D8EC;
+
+  /* ── 朱 ── 印章的紅。柔化過，不再是正紅
+   * 也加深過：#B85C6B 對比只有 3.47，而它用在警告與
+   *    「講不下的約束」上 —— 最需要被讀到的字反而最淡。現在 4.95。 */
+  /* Logo 的印章色。不是 --shu ——
+   *    全站朱色為了文字對比度加深過（正文原本低於 WCAG AA），
+   *    Logo 是圖形不受那條限制，取「粉紅與紅之間」的最淺一階。
+   *    反過來把 --shu 一起調淺的話，警告文字會變回讀不清楚。 */
+  --seal:         #C97887;
+  --shu:          #9A4553;
+  --shu-soft:     #D599A5;
+  --shu-wash:     #EFDDE3;
+
+  /* ── 琥珀 ── 進行中的光 */
+  --kohaku:       #B08A50;
+  --kohaku-wash:  #E9DECD;
+
+  --midori:       #5F8B77;
+  --midori-wash:  #DCE7E2;
+
+  /* ── 界線 ── */
+  --sen:          #D0C0CF;
+  --sen-soft:     #DCCEDB;
+
+  /* ── 字級（比一般後台的預設大約 ×1.35）── */
+  --fs-xs:   14px;
+  --fs-sm:   18px;
+  --fs-base: 20px;
+  --fs-lg:   27px;
+  --fs-num:  34px;
+
+  --mincho: 'Noto Serif TC', 'Yu Mincho', 'Hiragino Mincho ProN', Georgia, serif;
+  --gothic: 'DM Sans', 'Noto Sans TC', 'Yu Gothic', 'Hiragino Sans',
+            'Microsoft JhengHei', -apple-system, sans-serif;
+  --mono: 'SF Mono', 'Cascadia Mono', 'Consolas', monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--washi);
+  color: var(--sumi);
+  font-family: var(--gothic);
+  font-size: var(--fs-base);
+  font-weight: 300;
+  line-height: 1.9;
+  letter-spacing: 0.02em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══════════════════ 背景 ═══════════════════
+ * 三層，全部用 CSS：
+ *   1. 和紙纖維 —— 兩個方向的極細斜線
+ *   2. 朱の暈 —— 右上一片極淡的紅，像印泥暈開
+ *   3. 底部的暖 —— 讓長頁面的下半不會空掉
+ */
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle 560px at 84% 6%,
+      rgba(183, 163, 204, 0.22), transparent 68%),
+    radial-gradient(ellipse 130% 52% at 50% 110%,
+      rgba(228, 169, 190, 0.20), transparent 62%);
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.75;
+  background-image:
+    repeating-linear-gradient(48deg,
+      rgba(90, 72, 92, 0.020) 0px,
+      rgba(90, 72, 92, 0.020) 1px,
+      transparent 1px, transparent 5px),
+    repeating-linear-gradient(-41deg,
+      rgba(90, 72, 92, 0.013) 0px,
+      rgba(90, 72, 92, 0.013) 1px,
+      transparent 1px, transparent 8px);
+}
+
+/* ═══════════════════ 版面 ═══════════════════ */
+
+.app {
+  position: relative;
+  z-index: 1;
+  min-height: 100%;
+  display: grid;
+  /* 左欄拉寬：關卡列加了 icon 之後需要更多水平空間 */
+  grid-template-columns: 360px 1fr;
+}
+
+@media (max-width: 980px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { display: none; }
+}
+
+.rail {
+  border-right: 1px solid var(--sen);
+  padding: 60px 0 60px 40px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  background: linear-gradient(90deg, rgba(247, 241, 232, 0.55), transparent);
+}
+
+.rail-brand {
+  font-family: var(--mincho);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  margin: 0 0 8px;
+  color: var(--sumi);
+}
+
+.rail-tagline {
+  font-family: var(--mincho);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--sumi-faint);
+  letter-spacing: 0.22em;
+  margin: 0 0 52px;
+}
+
+.rail-stages { list-style: none; margin: 0; padding: 0; }
+
+.rail-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0 6px 15px;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.09em;
+  color: var(--sumi-faint);
+  transition: color 0.4s ease;
+}
+
+.rail-stage::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  transform: translateY(-50%);
+  background: var(--sen);
+  transition: background 0.4s ease, box-shadow 0.4s ease;
+}
+
+.rail-stage.done { color: var(--sumi-soft); }
+.rail-stage.done::before { background: var(--shu-soft); }
+
+.rail-stage.current { color: var(--sumi); }
+.rail-stage.current::before {
+  background: var(--shu);
+  box-shadow: 0 0 0 5px var(--shu-wash);
+}
+
+.main {
+  padding: 60px 84px 140px;
+  /* 1180 → 1300：左欄拉寬吃掉的 40px 補回來之外再多給，
+     正文區才是真的變大。 */
+  max-width: 1300px;
+}
+
+@media (max-width: 980px) {
+  .main { padding: 32px 24px 96px; }
+}
+
+/* ═══════════════════ 語言切換 ═══════════════════ */
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 60px;
+}
+
+.lang-switch { display: inline-flex; gap: 6px; }
+
+.lang-switch button {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sumi-faint);
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  padding: 7px 17px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.lang-switch button:hover { color: var(--sumi-soft); }
+
+/* 選中 —— 朱の印 */
+.lang-switch button.on {
+  color: var(--shu);
+  border-color: var(--shu-soft);
+  background: var(--shu-wash);
+}
+
+.lang-switch button:focus-visible {
+  outline: 1px solid var(--shu);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════ 排版 ═══════════════════ */
+
+.eyebrow {
+  font-family: var(--mincho);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  letter-spacing: 0.3em;
+  color: var(--shu);
+  margin: 0 0 16px;
+}
+
+h1 {
+  font-family: var(--mincho);
+  font-size: clamp(34px, 5vw, 56px);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.03em;
+  margin: 0 0 20px;
+  color: var(--sumi);
+  text-wrap: balance;
+}
+
+h2 {
+  font-family: var(--mincho);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  margin: 0 0 18px;
+  color: var(--sumi);
+}
+
+.lede {
+  color: var(--sumi-soft);
+  font-size: var(--fs-base);
+  margin: 0 0 12px;
+}
+
+.section { margin-top: 84px; }
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--sen);
+  padding-bottom: 14px;
+  margin-bottom: 34px;
+}
+
+.section-head h2 { margin: 0; }
+
+.section-note {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--sumi-faint);
+  letter-spacing: 0.05em;
+}
+
+/* ═══════════════════ 數字 ═══════════════════ */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 36px;
+  background: var(--washi-warm);
+  border: 1px solid var(--sen-soft);
+  padding: 34px 40px;
+}
+
+.stat-label {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.2em;
+  color: var(--sumi-faint);
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-family: var(--mincho);
+  font-size: var(--fs-num);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--sumi);
+  line-height: 1.35;
+}
+
+.stat-value .unit {
+  font-family: var(--gothic);
+  font-size: var(--fs-sm);
+  font-weight: 300;
+  color: var(--sumi-faint);
+  margin-left: 6px;
+}
+
+/* ═══════════════════ 段落 ═══════════════════ */
+
+.segments { display: flex; flex-direction: column; }
+
+.segment {
+  display: grid;
+  grid-template-columns: 66px 1fr auto;
+  gap: 30px;
+  align-items: start;
+  padding: 30px 0;
+  border-bottom: 1px solid var(--sen);
+  cursor: pointer;
+  transition: background 0.35s ease;
+}
+
+.segment:hover { background: var(--washi-warm); }
+.segment:focus-visible { outline: 1px solid var(--shu-soft); outline-offset: 3px; }
+
+.segment-no {
+  font-family: var(--mincho);
+  font-size: 42px;
+  font-weight: 400;
+  color: var(--sen);
+  line-height: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.35s;
+}
+
+.segment:hover .segment-no { color: var(--shu-soft); }
+.segment.done .segment-no { color: var(--shu); }
+
+.segment-title {
+  font-family: var(--mincho);
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
+  color: var(--sumi);
+  line-height: 1.6;
+}
+
+.segment-synopsis {
+  font-size: var(--fs-sm);
+  color: var(--sumi-soft);
+  margin: 0;
+  line-height: 1.9;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.segment-meta {
+  text-align: right;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--sumi-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.9;
+}
+
+.segment-cost {
+  font-family: var(--mincho);
+  color: var(--sumi);
+  font-size: 26px;
+  font-weight: 500;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  padding: 3px 12px;
+  margin-top: 10px;
+  border: 1px solid currentColor;
+}
+
+.badge.not-started { color: var(--sumi-faint); background: var(--washi-sunk); }
+.badge.in-progress { color: var(--kohaku); background: var(--kohaku-wash); }
+.badge.done { color: var(--midori); background: var(--midori-wash); }
+
+/* ═══════════════════ 表 ═══════════════════ */
+
+.scroll { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  min-width: 680px;
+}
+
+th {
+  text-align: left;
+  font-family: var(--mincho);
+  font-weight: 500;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.18em;
+  color: var(--sumi-faint);
+  border-bottom: 1px solid var(--sen);
+  padding: 0 24px 12px 0;
+  white-space: nowrap;
+}
+
+td {
+  padding: 16px 24px 16px 0;
+  border-bottom: 1px solid var(--sen-soft);
+  vertical-align: top;
+  color: var(--sumi-soft);
+  line-height: 1.85;
+}
+
+td.key { color: var(--sumi); font-family: var(--mincho); font-size: 20px; font-weight: 500; }
+td.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+}
+
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--washi-warm); }
+
+/* ═══════════════════ 提示 ═══════════════════ */
+
+.notice {
+  border-left: 3px solid var(--shu-soft);
+  background: var(--shu-wash);
+  padding: 18px 24px;
+  margin: 22px 0;
+  font-size: var(--fs-sm);
+  color: var(--sumi-soft);
+  line-height: 1.95;
+}
+
+.notice.warn { border-left-color: var(--shu); }
+.notice strong {
+  color: var(--sumi);
+  font-weight: 500;
+  font-family: var(--mincho);
+}
+
+.empty {
+  color: var(--sumi-faint);
+  font-family: var(--mincho);
+  font-size: var(--fs-base);
+  letter-spacing: 0.16em;
+  padding: 84px 0;
+  text-align: center;
+}
+
+/* ═══════════════════ 原文 ═══════════════════ */
+
+.drawer {
+  background: var(--washi-warm);
+  border-left: 3px solid var(--sen);
+  padding: 26px 32px;
+  margin: 12px 0 30px;
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  line-height: 2.15;
+  letter-spacing: 0.04em;
+  color: var(--sumi-soft);
+  white-space: pre-wrap;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.drawer-head {
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.2em;
+  color: var(--sumi-faint);
+  margin-bottom: 16px;
+}
+
+.drawer-head.warn { color: var(--shu); }
+
+/* ── 物理約束清單 ──────────────────────────────────────────
+   .drawer 帶 white-space: pre-wrap（那是為了原文排版），
+   清單裡要關掉，否則 JSX 縮排會被當成內容印出來。 */
+.guard-list {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  white-space: normal;
+}
+
+.guard-list li {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-top: 1px solid var(--washi-line, rgba(0, 0, 0, 0.06));
+  line-height: 1.75;
+}
+
+.guard-cat {
+  flex: 0 0 6.5em;
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  color: var(--sumi-faint);
+}
+
+.guard-principle {
+  flex: 1;
+  font-size: var(--fs-sm);
+  color: var(--sumi-soft);
+}
+
+/* 講不下的那些用朱色左邊界標出來 —— 它們不是「沒關係的細節」，
+   是想講但這一鏡塞不下的約束。 */
+.guard-list.skipped li {
+  border-top-color: var(--shu-soft);
+  background: var(--shu-wash);
+  padding-left: 14px;
+  margin-left: -14px;
+}
+
+.guard-note {
+  margin: 0 0 14px;
+  font-size: var(--fs-xs);
+  color: var(--shu);
+  white-space: normal;
+}
+
+/* ═══════════════════ 按鈕 ═══════════════════ */
+
+.btn {
+  appearance: none;
+  font-family: var(--gothic);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  padding: 13px 34px;
+  border: 1px solid var(--sen);
+  background: rgba(246, 240, 246, 0.5);
+  color: var(--sumi-soft);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn:hover { color: var(--sumi); border-color: var(--sumi-faint); }
+.btn:focus-visible { outline: 1px solid var(--shu); outline-offset: 3px; }
+
+.btn.primary {
+  background: var(--shu);
+  border-color: var(--shu);
+  color: #fff;
+  letter-spacing: 0.18em;
+}
+.btn.primary:hover { background: #A93830; border-color: #A93830; }
+.btn.primary:disabled { opacity: 0.45; cursor: default; }
+
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.back {
+  background: none;
+  border: 0;
+  color: var(--sumi-faint);
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  padding: 0;
+}
+.back:hover { color: var(--sumi-soft); }
+
+/* ═══════════════════ 上傳 ═══════════════════ */
+
+.dropzone {
+  border: 1px solid var(--sen);
+  padding: 100px 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.4s ease, background 0.4s ease;
+  background:
+    radial-gradient(ellipse 58% 64% at 50% 44%,
+      rgba(246, 240, 246, 0.55), transparent 72%),
+    var(--washi-warm);
+}
+
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--shu-soft);
+  outline: none;
+}
+
+.dropzone[data-over='true'] {
+  border-color: var(--shu);
+  background:
+    radial-gradient(ellipse 58% 64% at 50% 44%,
+      rgba(246, 240, 246, 0.6), transparent 72%),
+    var(--shu-wash);
+}
+
+.dropzone[data-busy='true'] { cursor: default; opacity: 0.55; }
+
+.dropzone-hint {
+  font-family: var(--mincho);
+  color: var(--sumi-soft);
+  font-size: 23px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  margin: 0 0 36px;
+}
+
+.dropzone-formats {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--sumi-faint);
+  letter-spacing: 0.1em;
+  margin: 36px 0 0;
+}
+
+/* ═══════════════════ 費用 ═══════════════════ */
+
+.cost-range {
+  font-family: var(--mincho);
+  font-size: 46px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--shu);
+  line-height: 1.4;
+}
+
+.cost-range .mid {
+  display: block;
+  font-family: var(--mono);
+  color: var(--sumi-faint);
+  font-size: var(--fs-xs);
+  margin-top: 8px;
+  letter-spacing: 0.05em;
+}
+
+.chapter-preview {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--fs-sm);
+  color: var(--sumi-soft);
+}
+
+.chapter-preview li {
+  padding: 13px 0;
+  border-bottom: 1px solid var(--sen-soft);
+  display: flex;
+  gap: 26px;
+  line-height: 1.8;
+}
+
+.chapter-preview li span:first-child {
+  font-family: var(--mincho);
+  color: var(--sumi-faint);
+  min-width: 34px;
+  text-align: right;
+  font-size: 21px;
+}
+
+.actions {
+  display: flex;
+  gap: 18px;
+  margin-top: 48px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ═══════════════════ 動く背景 ═══════════════════
+ *
+ * 常見的 hero-blob 手法：兩個大色塊在背景緩慢漂浮
+ * （float：8s / 10s，上下 30px 並微微放大），
+ * 加上 gentle-pulse 呼吸、sparkle 閃爍。
+ *
+ * 這裡用和紙的語言重寫：
+ *   墨暈    朱與琥珀的印泥在紙上暈開，緩慢地呼吸
+ *   塵      極淡的光點，像斜射的光裡浮動的灰塵
+ *
+ * 三個原則：
+ *   1. 極淡 —— 這是背景不是內容，不能跟文字搶注意力
+ *   2. 極慢 —— 18~26 秒一個週期。快的動畫會讓人焦躁，
+ *              慢到「你不看它就不會發現」才對
+ *   3. 尊重 prefers-reduced-motion —— 前庭功能敏感的人會暈
+ */
+
+.washi-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  will-change: transform;
+}
+
+/* 朱の暈 —— 右上，最大最淡 */
+.blob-1 {
+  width: 620px;
+  height: 620px;
+  top: -180px;
+  right: -140px;
+  background: radial-gradient(
+    circle,
+    rgba(228, 169, 190, 0.34),
+    rgba(228, 169, 190, 0.10) 55%,
+    transparent 72%
+  );
+  animation: sumi-drift 24s ease-in-out infinite;
+}
+
+/* 琥珀の暈 —— 左下 */
+.blob-2 {
+  width: 520px;
+  height: 520px;
+  bottom: -160px;
+  left: -120px;
+  background: radial-gradient(
+    circle,
+    rgba(183, 163, 204, 0.32),
+    rgba(183, 163, 204, 0.09) 55%,
+    transparent 72%
+  );
+  animation: sumi-drift 19s ease-in-out infinite reverse;
+  animation-delay: -6s;
+}
+
+/* 墨の暈 —— 中偏右，最淡，只是讓中段不空 */
+.blob-3 {
+  width: 400px;
+  height: 400px;
+  top: 46%;
+  right: 12%;
+  background: radial-gradient(
+    circle,
+    rgba(200, 178, 210, 0.20),
+    transparent 68%
+  );
+  animation: sumi-drift 27s ease-in-out infinite;
+  animation-delay: -11s;
+}
+
+@keyframes sumi-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(22px, -34px) scale(1.07); }
+  66%      { transform: translate(-18px, 20px) scale(0.95); }
+}
+
+/* 塵 —— 斜光裡的灰塵。四點，各自不同步 */
+.dust {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(228, 169, 190, 0.55);
+  animation: dust-rise 14s ease-in-out infinite;
+}
+
+
+@keyframes dust-rise {
+  0%, 100% { opacity: 0; transform: translateY(0) scale(0.6); }
+  50%      { opacity: 0.75; transform: translateY(-14px) scale(1.25); }
+}
+
+/* 進行中的階段 —— 呼吸 */
+.rail-stage.current::before {
+  animation: breathe 3.4s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: translateY(-50%) scale(1); box-shadow: 0 0 0 5px var(--shu-wash); }
+  50%      { transform: translateY(-50%) scale(1.18); box-shadow: 0 0 0 9px var(--shu-wash); }
+}
+
+/* 空舞台的呼吸 —— 等著被放東西上來 */
+.dropzone:not([data-busy='true']) {
+  animation: stage-breathe 7s ease-in-out infinite;
+}
+
+@keyframes stage-breathe {
+  0%, 100% { border-color: var(--sen); }
+  50%      { border-color: #D0BCCF; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blob, .dust, .rail-stage.current::before, .dropzone {
+    animation: none !important;
+  }
+}
+
+/* ═══════════════════ 鳥居 ═══════════════════
+ *
+ * 背景放一座大鳥居，但要淡、不能亮眼。
+ *
+ * 一座明神鳥居的剪影，落在右下。柱子微微外八（真實鳥居的收分），
+ * 笠木兩端上翹。opacity 壓到 0.10 —— 像霧裡的輪廓，
+ * 你要盯著看才會發現它在那裡。
+ *
+ * 用 SVG 不用圖片：向量在任何解析度都乾淨，而且顏色能跟著主題走。
+ */
+
+.torii {
+  position: absolute;
+  left: 50%;
+  /* 放在畫面中下部，不要太高：
+     從畫面 44% 的高度開始往下長，柱腳走出視窗下緣 ——
+     被切斷的柱子反而有「從地面長出來」的延伸感。 */
+  top: 44%;
+  transform: translateX(-50%);
+  width: min(760px, 70vw);
+  height: auto;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@media (max-width: 980px) {
+  .torii { width: 104vw; top: 52%; opacity: 0.38; }
+}
+
+/* ═══════════════════ 櫻 ═══════════════════
+ *
+ * 背景的櫻花：慢慢掉落的感覺。
+ *
+ * 花瓣的形狀用 border-radius 做：一角尖、對角圓，就是櫻花瓣的輪廓。
+ * 每一片有三個各自獨立的變化：
+ *   落下的時間（16–29 秒，慢）
+ *   水平的漂移（風把它吹偏）
+ *   自轉（花瓣在空中翻面）
+ *
+ * 只放 11 片。真實的落櫻是稀疏的 ——
+ *    鋪滿螢幕的花瓣是螢幕保護程式，不是氛圍。
+ */
+
+.petal {
+  position: absolute;
+  top: -40px;
+  width: 20px;
+  height: 20px;
+  background: var(--sakura);
+  opacity: 0;
+  /* 一角尖、對角圓 —— 櫻花瓣的輪廓 */
+  border-radius: 100% 0 100% 100%;
+  animation: petal-fall linear infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes petal-fall {
+  0% {
+    opacity: 0;
+    transform: translate(0, -40px) rotate(0deg) scale(0.9);
+  }
+  8% { opacity: 0.55; }
+  88% { opacity: 0.4; }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift, 90px), 105vh) rotate(560deg) scale(1);
+  }
+}
+
+/* 每一片的位置／速度／漂移／大小由 React 用 inline style 給。
+ *
+ *    若寫成 `.petal:nth-of-type(1..11)`，最後幾片會是隱形的 ——
+ *    `nth-of-type` 算的是「同標籤的第幾個」，而 blob 與 dust 也是 <span>，
+ *    編號整個錯位。沒對到規則的花瓣沒有 animation-duration，
+ *    等於不動、而且卡在 keyframes 0% 的 opacity: 0。
+ *
+ *    這種 bug 不會報錯、畫面也「看起來有東西在動」，最難發現。
+ *    靠 DOM 順序做樣式本來就脆弱 —— 中間插一個元素就全毀。
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  .petal { animation: none; opacity: 0.28; }
+}
+
+/* ═══════════════════ 選擇按鈕 ═══════════════════
+ *
+ * 「零輸入」原則的主要載體 —— 使用者只按按鈕。
+ * 每個選項自己說明「這是什麼、適合誰、對成功率的影響」，
+ * 不需要他先去別的地方讀懂。
+ */
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.choices.ratios { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+.choice {
+  appearance: none;
+  text-align: left;
+  background: rgba(246, 240, 246, 0.5);
+  border: 1px solid var(--sen);
+  padding: 18px 20px;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.choice:hover:not(:disabled) {
+  border-color: var(--shu-soft);
+  background: var(--washi-warm);
+}
+
+.choice.on {
+  border-color: var(--shu);
+  background: var(--shu-wash);
+}
+
+.choice:disabled { opacity: 0.5; cursor: default; }
+.choice:focus-visible { outline: 1px solid var(--shu); outline-offset: 3px; }
+
+.choice-label {
+  font-family: var(--mincho);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--sumi);
+  letter-spacing: 0.04em;
+}
+
+.choice-hint {
+  font-size: var(--fs-xs);
+  color: var(--sumi-soft);
+  line-height: 1.7;
+}
+
+/* 難度差異 —— 產品最反直覺的資訊，直接標在按鈕角落 */
+.choice-delta {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--sumi-faint);
+}
+.choice-delta.up { color: var(--midori); }
+.choice-delta.down { color: var(--shu); }
+
+/* ═══════════════════ 方案表 ═══════════════════ */
+
+tr.recommended td {
+  background: var(--shu-wash);
+}
+tr.recommended td.key { color: var(--shu); }
+
+/* 檔位列可以點選 —— 這張表是選擇器，不只是價目表 */
+tr.selectable { cursor: pointer; }
+tr.selectable:hover td { background: var(--sen-wash, rgba(0, 0, 0, 0.03)); }
+tr.chosen td {
+  background: var(--midori-wash);
+}
+tr.chosen td.key { color: var(--midori); font-weight: 600; }
+
+.tier-hint {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: var(--sumi-faint);
+}
+
+.badge.over { color: var(--shu); background: var(--shu-wash); }
+
+/* ═══════════════════ 風險鏡頭 ═══════════════════ */
+
+.risk {
+  border-bottom: 1px solid var(--sen-soft);
+  padding: 20px 0;
+}
+
+.risk-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.risk-rate {
+  font-family: var(--mincho);
+  font-size: 30px;
+  font-weight: 500;
+  color: var(--shu);
+  font-variant-numeric: tabular-nums;
+  min-width: 76px;
+}
+
+.risk-id {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--sumi-faint);
+}
+
+.risk-desc {
+  font-size: var(--fs-sm);
+  color: var(--sumi);
+  flex: 1;
+  min-width: 240px;
+}
+
+.risk-factors {
+  margin: 10px 0 0 92px;
+  padding: 0;
+  list-style: none;
+}
+
+.risk-factors li {
+  font-size: var(--fs-xs);
+  color: var(--sumi-soft);
+  line-height: 1.9;
+  padding-left: 16px;
+  position: relative;
+}
+
+.risk-factors li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--shu-soft);
+}
+
+@media (max-width: 700px) {
+  .risk-factors { margin-left: 0; }
+}
+
+/* ═══════════════════ 選角關卡 ═══════════════════
+   第 5 關。三張候選圖並排讓人用眼睛選 ——
+   所以圖要夠大、差異要看得出來、旁邊的字不能搶戲。 */
+
+.casting-head h2 {
+  font-family: var(--mincho);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.2em;
+  margin: 0 0 14px;
+  color: var(--sumi);
+}
+
+.casting-why {
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  line-height: 2.05;
+  letter-spacing: 0.03em;
+  color: var(--sumi-soft);
+  max-width: 62ch;
+  margin: 0 0 26px;
+}
+
+/* 閘門狀態列。can_proceed 為 false 時一定要說出還缺誰 ——
+   只顯示一個灰掉的按鈕而不說原因，使用者會以為系統壞了。 */
+.casting-gate {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 16px 22px;
+  border-left: 3px solid var(--sen);
+  background: var(--washi-warm);
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  color: var(--sumi-soft);
+}
+.casting-gate.ok { border-left-color: var(--midori); background: var(--midori-wash); }
+.casting-gate.blocked { border-left-color: var(--kohaku); background: var(--kohaku-wash); }
+.casting-gate-count { font-family: var(--mono); color: var(--sumi); }
+.casting-gate-msg { flex: 1; }
+.casting-gate-spent { font-family: var(--mono); color: var(--sumi-faint); }
+
+/* 角色 chips。一次只展開一個角色 —— 六個角色各自攤開候選圖
+   會變成一條看不完的長捲軸，而選角是一次專心處理一個人的工作。 */
+.casting-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 30px 0 24px;
+}
+
+.casting-chip {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 20px;
+  border: 1px solid var(--sen);
+  background: rgba(246, 240, 246, 0.5);
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  color: var(--sumi-soft);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.casting-chip:hover { border-color: var(--sumi-faint); color: var(--sumi); }
+.casting-chip.on {
+  border-color: var(--shu);
+  color: var(--shu);
+  background: var(--shu-wash);
+}
+.casting-chip.locked .casting-chip-meta { color: var(--midori); }
+.casting-chip-meta { font-family: var(--mono); color: var(--sumi-faint); }
+
+.casting-panel { margin-top: 8px; }
+
+.casting-person {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.casting-person h3 {
+  font-family: var(--mincho);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.14em;
+  margin: 0;
+  color: var(--sumi);
+}
+
+.tag {
+  font-family: var(--gothic);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  padding: 4px 11px;
+  border: 1px solid var(--sen);
+  color: var(--sumi-faint);
+}
+.tag.alt { border-color: var(--fuji); color: var(--fuji); }
+/* 誠實原則的視覺化：綠色＝劇本寫的、琥珀＝系統推測的。
+   使用者有權一眼看出哪些是他自己寫的、哪些是系統猜的。 */
+.tag.good { border-color: var(--midori); color: var(--midori); }
+.tag.guess { border-color: var(--kohaku); color: var(--kohaku); }
+
+.casting-source {
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  line-height: 2;
+  color: var(--sumi-soft);
+  background: var(--washi-warm);
+  border-left: 3px solid var(--midori);
+  padding: 16px 20px;
+  margin: 0 0 22px;
+  max-width: 70ch;
+}
+
+.casting-actions { margin: 20px 0 26px; }
+
+.casting-reroll-title {
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.16em;
+  color: var(--sumi-faint);
+  margin: 0 0 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+/* 價格直接印在按鈕上 —— 按下去之前要能回答「這一按花多少」 */
+.price {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  margin-left: 10px;
+}
+
+.casting-directions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn.direction {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 11px 18px;
+  text-align: left;
+}
+.direction-label { font-size: var(--fs-xs); letter-spacing: 0.12em; }
+.direction-hint {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--sumi-faint);
+  font-family: var(--mincho);
+}
+
+.btn.small { padding: 8px 18px; font-size: var(--fs-xs); }
+
+.casting-waiting {
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  color: var(--sumi-faint);
+  letter-spacing: 0.12em;
+  margin: 16px 0 0;
+}
+
+.casting-locked {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+  background: var(--midori-wash);
+  border-left: 3px solid var(--midori);
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  color: var(--sumi-soft);
+  margin: 20px 0 26px;
+}
+
+/* 成本提示是「提示」不是「阻擋」—— 這是使用者的錢也是他的創作決定 */
+.casting-notice {
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  line-height: 1.95;
+  padding: 14px 20px;
+  margin: 0 0 22px;
+  max-width: 70ch;
+}
+.casting-notice.soft { background: var(--washi-warm); color: var(--sumi-soft); }
+.casting-notice.hard {
+  background: var(--kohaku-wash);
+  border-left: 3px solid var(--kohaku);
+  color: var(--sumi);
+}
+
+.casting-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 22px;
+  margin-top: 20px;
+}
+
+.casting-card {
+  margin: 0;
+  border: 1px solid var(--sen);
+  background: rgba(246, 240, 246, 0.45);
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.25s ease;
+}
+.casting-card:hover { border-color: var(--sumi-faint); }
+.casting-card.chosen {
+  border-color: var(--shu);
+  box-shadow: 0 0 0 1px var(--shu);
+}
+.casting-card img {
+  /* 3:4 是舊專案（直式選角圖）的後備值；新專案由 inline style 蓋成專案比例。
+     舊直圖被裁時保住頭部 —— 臉幾乎都在上三分之一。 */
+  object-position: top center;
+  width: 100%;
+  display: block;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+.casting-noimage {
+  aspect-ratio: 3 / 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--washi-sunk);
+  color: var(--sumi-faint);
+  font-family: var(--mincho);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.12em;
+}
+
+/* 文字版候選：外貌／聲音描述攤開給人看（英文標籤，字距不拉開、可捲動） */
+.casting-textonly {
+  aspect-ratio: auto;
+  min-height: 120px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 16px;
+  overflow-y: auto;
+  letter-spacing: normal;
+  color: var(--sumi);
+  font-family: inherit;
+  line-height: 1.6;
+}
+.casting-textonly strong { color: var(--sumi-faint); font-family: var(--mincho); letter-spacing: 0.12em; }
+.casting-textonly p { margin: 0; }
+
+.casting-card figcaption { padding: 16px 18px; flex: 1; }
+
+.casting-interp {
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  line-height: 1.85;
+  color: var(--sumi);
+  margin: 0 0 10px;
+}
+.casting-basis {
+  font-family: var(--gothic);
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--sumi-faint);
+  margin: 0 0 10px;
+}
+.casting-roundno {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--sumi-faint);
+}
+
+.casting-card .btn { margin: 0 18px 18px; }
+
+.casting-chosen-flag {
+  display: block;
+  padding: 10px 18px 16px;
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.16em;
+  color: var(--shu);
+}
+
+@media (max-width: 700px) {
+  .casting-grid { grid-template-columns: 1fr; }
+  .casting-gate { flex-direction: column; gap: 8px; }
+}
+
+/* ═══════════════════ 提示詞導出 ═══════════════════
+   全部 $0。做得像一份可以帶走的清單，而不是一個藏起來的技術細節。 */
+
+.prompts-note {
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  line-height: 2.05;
+  color: var(--sumi-soft);
+  max-width: 64ch;
+  margin: 0 0 20px;
+}
+
+/* 提示詞語言切換。跟左上角的介面語言是不同的東西 ——
+   那個管使用者看到的字，這個管餵給模型的畫面描述。 */
+.prompts-lang {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.prompts-lang .btn.on {
+  border-color: var(--shu);
+  color: var(--shu);
+  background: var(--shu-wash);
+  cursor: default;
+}
+.prompts-rewriting {
+  font-family: var(--mincho);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.12em;
+  color: var(--sumi-faint);
+}
+
+.prompts-lang-note {
+  font-family: var(--mincho);
+  font-size: var(--fs-xs);
+  line-height: 1.95;
+  color: var(--sumi-faint);
+  max-width: 64ch;
+  margin: 0 0 24px;
+}
+
+.prompts-download {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+.prompts-download-label {
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.16em;
+  color: var(--sumi-faint);
+  margin-right: 6px;
+}
+.prompts-download .btn {
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+
+.prompts-list { display: flex; flex-direction: column; }
+
+.prompt-row { border-top: 1px solid var(--sen-soft); }
+.prompt-row:last-child { border-bottom: 1px solid var(--sen-soft); }
+
+.prompt-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+}
+.prompt-id {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--sumi);
+  min-width: 78px;
+}
+.prompt-len {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--sumi-faint);
+  min-width: 78px;
+}
+/* 預覽只給一行 —— 這一列是「找到你要的那一鏡」，不是閱讀區 */
+.prompt-preview {
+  flex: 1;
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  color: var(--sumi-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.prompt-body {
+  padding: 6px 0 26px;
+  border-left: 3px solid var(--sen);
+  padding-left: 22px;
+  margin-bottom: 8px;
+}
+
+.prompt-section { margin-bottom: 16px; }
+.prompt-section-label {
+  display: block;
+  font-family: var(--gothic);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--sumi-faint);
+  margin-bottom: 6px;
+}
+.prompt-section p {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--sumi);
+  word-break: break-word;
+}
+
+.prompt-constraints { margin-top: 22px; }
+.prompt-constraints ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.prompt-constraints li {
+  font-family: var(--mincho);
+  font-size: var(--fs-xs);
+  line-height: 1.95;
+  color: var(--sumi-soft);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sen-soft);
+}
+.prompt-constraints li strong {
+  font-family: var(--gothic);
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--kohaku);
+  margin-right: 12px;
+}
+
+@media (max-width: 700px) {
+  .prompt-head { flex-wrap: wrap; }
+  .prompt-preview { display: none; }
+}
+
+/* ═══════════════════ 試拍 / 批次 / 接片 ═══════════════════
+   影片要夠大看得清楚，但一段十二鏡並排時也不能佔滿整個畫面。 */
+
+.prod-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.prod-actions a.btn { text-decoration: none; }
+
+/* 歷次 take 選擇列：緊貼影片下方、比動作列低調（它是選項不是行動） */
+.prod-takes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 4px;
+}
+
+/* 角色 chip 上的生成指示。
+   不同角色可以同時生成 —— 切走之後如果沒有指示，
+      使用者不知道背景還有事在跑。 */
+.chip-spin {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--washi-sunk);
+  border-top-color: var(--shu);
+  border-radius: 50%;
+  animation: auto-spin 0.9s linear infinite;
+}
+
+/* 選角閘門 —— 擋在生成前面，要一眼看到。
+   用朱色左邊框（跟 notice.warn 同一個語彙），不用紅底 ——
+   這不是錯誤，是「你還有一步沒做」。 */
+.casting-gate {
+  border-left: 3px solid var(--shu);
+  padding-left: 18px;
+  background: rgba(246, 240, 246, 0.55);
+}
+.casting-gate .section-head { margin-bottom: 8px; }
+
+/* ── 一鍵生成 ──────────────────────────────────────────────
+ *
+ * 給不想逐鏡操作的人一條一鍵路徑。
+ *
+ * 進度條不是裝飾。一鍵跑十二鏡是 20–30 分鐘，
+ *    沒有進度回饋的話「正在生成」跟「當掉了」長得一模一樣，
+ *    而使用者唯一能做的判斷就是關掉重來 —— 那會浪費已經花掉的錢。
+ */
+.auto-run {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--sen);
+  background: rgba(246, 240, 246, 0.45);
+}
+.auto-run .prod-actions { margin: 0; }
+
+.auto-bar {
+  height: 3px;
+  background: var(--washi-sunk);
+  overflow: hidden;
+}
+.auto-bar-fill {
+  height: 100%;
+  background: var(--shu);
+  transition: width 0.6s ease;
+}
+
+.auto-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--sumi-soft);
+}
+
+/* 轉圈 —— 它證明「還活著」。進度條在一鏡的 1–3 分鐘之內是靜止的，
+   只有這個一直在動，使用者才不會以為卡死。 */
+.auto-spin {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--washi-sunk);
+  border-top-color: var(--shu);
+  border-radius: 50%;
+  animation: auto-spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes auto-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 燒字幕區塊 —— 跟上面「下載 .srt」拉開距離，
+   兩者長得太像的話使用者會以為是同一件事。 */
+.burn-block {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--sen);
+}
+
+.prod-clips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.prod-clip {
+  border: 1px solid var(--sen);
+  background: rgba(246, 240, 246, 0.45);
+  padding: 0 0 4px;
+}
+/* 等確認的那一鏡要一眼看到 —— 它是流程的當前位置 */
+.prod-clip.waiting {
+  border-color: var(--shu);
+  box-shadow: 0 0 0 1px var(--shu);
+}
+.prod-clip.failed { border-color: var(--kohaku); }
+
+.prod-clip video {
+  width: 100%;
+  display: block;
+  background: #000;
+}
+
+.prod-clip-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px 4px;
+}
+
+.prod-clip .prod-actions { padding: 0 16px; margin: 10px 0 12px; }
+.prod-clip .notice { margin: 8px 16px; }
+
+.prod-reset {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--sen-soft);
+}
+.prod-reset .prompts-lang-note { margin: 0; }
+
+@media (max-width: 700px) {
+  .prod-clips { grid-template-columns: 1fr; }
+}
+
+
+/* ═══════════════════ 內容預審 ═══════════════════ */
+/* 風險卡片刻意跟「錯誤」長得不一樣 —— 這是建議不是故障，
+   高風險才用朱色左邊框（跟 .notice.warn 同一套語彙）。 */
+
+.screening-card {
+  border: 1px solid var(--fuji-pale);
+  border-left: 3px solid var(--fuji);
+  background: var(--washi-warm);
+  padding: 18px 24px;
+  margin: 16px 0;
+}
+
+.screening-card.high { border-left-color: var(--shu); }
+
+.screening-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.screening-card-head strong {
+  font-family: var(--mincho);
+  color: var(--sumi);
+}
+
+.screening-excerpt {
+  margin: 12px 0;
+  padding: 12px 18px;
+  border-left: 2px solid var(--fuji-pale);
+  background: var(--washi);
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  color: var(--sumi-soft);
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+
+.screening-note { font-size: var(--fs-sm); line-height: 1.9; }
+.screening-note strong { display: block; margin-top: 10px; color: var(--sumi); }
+.screening-note p { margin: 4px 0 0; color: var(--sumi-soft); }
+
+/* 還沒掃描時的行動卡 —— 入口按鈕太小會被找不到，所以做成一整張卡。
+   用朱色左框 + 淡朱底，跟 .notice.warn 同一套「這裡要看一下」的語彙，
+   在一片和紙淡紫裡跳得出來，但不到警報的程度（這是建議不是錯誤）。 */
+.screening-cta {
+  border-left: 3px solid var(--shu);
+  background: var(--shu-wash);
+  padding-left: 28px;
+}
+
+.screening-cta .section-head { margin-bottom: 10px; }
+
+.screening-cta-action {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+/* 按鈕旁的小字不要吃掉按鈕的視覺重量 */
+.screening-cta-action .prompts-lang-note { margin: 0; }
+
+/* ═══════════════════ 關卡列的 icon ═══════════════════ */
+/* icon 是輔助辨識，不是這一列的主角，文字才是。
+   狀態靠透明度走：沒到 → 淡、走過 → 半、現在 → 全彩。 */
+
+/* 尺寸差異就是進度指示：走到哪一關，哪一關就長大。
+   尺寸由 App.tsx 傳（40 / 當前 60），不要在這裡用 CSS width 蓋 ——
+      SVG 元素上 CSS width 覆蓋 width attribute 是規格灰色地帶，
+      實測 Chrome 不吃：規則在樣式表裡、選擇器也匹配，
+      computed 仍然是 attribute 的值。這裡只管透明度。 */
+.rail-stage-icon {
+  flex-shrink: 0;
+  opacity: 0.34;
+  transition: opacity 0.4s ease;
+}
+
+.rail-stage.done .rail-stage-icon { opacity: 0.72; }
+.rail-stage.current .rail-stage-icon { opacity: 1; }
+
+/* 區塊標題左邊的 icon */
+.section-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.section-icon { flex-shrink: 0; }
+
+/* 頁首的 Logo 與站名 */
+.rail-mark {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 8px;
+}
+
+/* 作品名稱前面的劇本記號（每個劇本前面都帶）。
+   用 inline-flex 讓 icon 跟文字基線對齊 —— 直接放在 <p> 裡會因為
+   SVG 是 inline 元素而底部對齊，長文字換行時第二行會跑到 icon 底下。 */
+.segment-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+h1.with-icon {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.title-icon { flex-shrink: 0; }
+
+/* 定調關卡裡的兩區小標（敘事形式 / 視覺風格）。
+   兩者最容易被搞混，所以各給一個明確的標題而不是擠在同一排按鈕。 */
+.look-subhead {
+  font-family: var(--mincho);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--sumi);
+  margin: 34px 0 6px;
+}
+.look-subhead:first-of-type { margin-top: 18px; }
+
+/* ClickHouse 原始紀錄表 —— 舉證用，讓學習迴路可被驗證。
+   刻意做得像資料庫的輸出而不像產品介面 —— 等寬字、細格線、
+   不做圓角與陰影。它的說服力來自「看起來就是一張真的表」。 */
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 12.5px;
+  margin-top: 10px;
+}
+
+.ledger-table th,
+.ledger-table td {
+  border: 1px solid var(--washi-sunk);
+  padding: 6px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ledger-table th {
+  background: var(--washi-warm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--sumi);
+}
+
+.ledger-table td { color: var(--sumi-soft); }
+.ledger-table tr:hover td { background: var(--washi-warm); }
+
+/* 載入中的骨架佔位。
+   為什麼要：
+      面板若載入前不佔位、拿到資料才整區冒出來，那個「突然蹦出來」
+      會被讀成「很慢」，其實 API 只花 0.35 秒。慢的體感來自版面跳動。
+   刻意用和紙色系的呼吸而不是常見的白色掃光：掃光在這個底色上像瑕疵。 */
+.skeleton {
+  background: var(--washi-warm);
+  border-radius: 2px;
+  animation: skeleton-breathe 1.6s ease-in-out infinite;
+}
+
+/* 尺寸照著它們要頂替的真實元素算，差一點點就是版面跳一點點：
+   .stat-label = fs-xs + margin-bottom 8px
+   .stat-value = fs-num × line-height 1.35
+   .btn        = fs-sm + 上下 padding 13px + 上下框線 1px */
+.skeleton-label {
+  width: 5.5em;
+  height: var(--fs-xs);
+  margin-bottom: 8px;
+}
+
+.skeleton-value {
+  width: 3.2em;
+  height: calc(var(--fs-num) * 1.35);
+}
+
+.skeleton-btn {
+  width: 15em;
+  height: calc(var(--fs-sm) + 28px);
+}
+
+@keyframes skeleton-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* 會動的東西一律尊重系統設定 —— 前庭敏感的人看不得脈動 */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+/* 展示版的上傳區說明。
+   展示站不呼叫 AI，丟檔進去會讓人以為真的可以生成。
+   刻意不移除上傳區 —— 拖放是產品的第一個畫面，訪客該看到那個入口設計。
+   所以留著、壓灰、旁邊說明白：中途撞牆比一開始就說清楚糟得多。 */
+.dropzone-wrap[data-demo='true'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  gap: 28px;
+  align-items: center;
+}
+
+.dropzone[data-demo='true'] {
+  opacity: 0.45;
+  cursor: default;
+  filter: grayscale(0.7);
+}
+
+.dropzone[data-demo='true'] .btn {
+  pointer-events: none;
+}
+
+.dropzone-demo-note {
+  border-left: 3px solid var(--shu-soft);
+  background: var(--washi-warm);
+  padding: 18px 22px;
+}
+
+.dropzone-demo-note p {
+  margin: 10px 0 0;
+  font-size: var(--fs-sm);
+  line-height: 1.8;
+  color: var(--sumi-soft);
+}
+
+.dropzone-demo-full {
+  color: var(--sumi-faint) !important;
+}
+
+.demo-badge {
+  display: inline-block;
+  font-family: var(--gothic);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.16em;
+  color: var(--shu);
+  border: 1px solid var(--shu-soft);
+  padding: 3px 10px;
+}
+
+@media (max-width: 900px) {
+  .dropzone-wrap[data-demo='true'] { grid-template-columns: 1fr; }
+}
+
+/* ── 身份參考（臉）與段落造型 ——
+   臉是輸入、造型是產出、服裝是段落層。沿用 casting-chip 的語彙。 ── */
+.identity-box {
+  margin: 14px 0 6px;
+  padding: 14px 18px;
+  border: 1px dashed var(--sen);
+  background: rgba(246, 240, 246, 0.35);
+}
+.identity-head {
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--gothic); font-size: var(--fs-xs); letter-spacing: 0.1em;
+  color: var(--sumi-soft);
+}
+.identity-body { display: flex; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+.identity-thumb {
+  width: 72px; height: 72px; object-fit: cover; border: 1px solid var(--sen); background: #fff;
+}
+.identity-none { margin: 0; color: var(--sumi-faint); font-size: var(--fs-xs); max-width: 48ch; }
+.identity-actions { display: flex; gap: 8px; }
+.identity-upload { margin-top: 12px; display: grid; gap: 8px; }
+.identity-hint { margin: 0; color: var(--sumi-soft); font-size: var(--fs-xs); max-width: 64ch; }
+.identity-consent {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: var(--fs-xs); color: var(--sumi); line-height: 1.5; cursor: pointer;
+}
+.identity-consent input { margin-top: 3px; }
+.identity-required { margin: 0; color: var(--shu); font-size: var(--fs-xs); }
+
+.look-mode { margin: 12px 0 8px; }
+.look-mode-title {
+  display: block; margin-bottom: 8px;
+  font-family: var(--gothic); font-size: var(--fs-xs); letter-spacing: 0.1em; color: var(--sumi-soft);
+}
+.look-mode-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn.chip {
+  padding: 7px 14px; border: 1px solid var(--sen);
+  background: rgba(246, 240, 246, 0.5); color: var(--sumi-soft);
+  font-family: var(--gothic); font-size: var(--fs-xs); letter-spacing: 0.08em;
+}
+.btn.chip:hover { border-color: var(--sumi-faint); color: var(--sumi); }
+.btn.chip.on { border-color: var(--shu); color: var(--shu); background: var(--shu-wash); }
+.btn.chip.has-look { border-style: double; }
+.look-mode-hint { margin: 8px 0 0; color: var(--sumi-faint); font-size: var(--fs-xs); max-width: 64ch; }
+.look-used-in {
+  display: block; margin-top: 4px;
+  font-family: var(--mono); font-size: 11px; color: var(--sumi-faint);
+}
+.identity-generate { margin-top: 12px; display: grid; gap: 8px; justify-items: start; }
+
+/* ── Greenlight Local：設定頁 ─────────────────────────────────────────
+   表格沿用 .ledger-table 的框線與字，但帳本是「不換行」（數字欄要對齊）；
+   設定頁的說明文字很長，不換行會把整頁撐到 1300px 寬（10/09 實測，窄視窗出現橫向捲軸）。 */
+.settings-table td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+.settings-table td:first-child { white-space: nowrap; }
+.settings-input { min-width: 0; flex: 1 1 220px; }
+.settings-table { table-layout: fixed; min-width: 0; }   /* 帳本表有 min-width 680（它在可橫捲的區塊裡），設定頁不需要 */
+.settings-table select, .settings-table input { max-width: 100%; }
+.settings-panel { min-width: 0; }
+/* 窄視窗時 .app 變單欄，格線欄預設「不小於內容最小寬」—— 設定頁的表格會把整頁撐寬。
+   讓主欄可以縮（其他頁本來就沒撐寬，不受影響）。 */
+.main { min-width: 0; }
+
+/* ── Greenlight Local：導演進度 ─────────────────────────────────────── */
+.direction-steps { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; }
+.direction-steps li { padding: 6px 14px; border: 1px solid var(--sen); color: var(--sumi-faint); font-size: var(--fs-xs); }
+.direction-steps li.done { color: var(--midori); background: var(--midori-wash); border-color: transparent; }
+.direction-steps li.current { color: var(--shu); background: var(--shu-wash); border-color: var(--shu-soft); font-weight: 500; }
+.direction-elapsed { margin-top: 6px; color: var(--sumi-faint); font-size: var(--fs-xs); }
+.direction-log { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.direction-log li { padding: 8px 12px; border-left: 2px solid var(--sen); color: var(--sumi-soft); overflow-wrap: anywhere; }
+.direction-log li.ok { border-left-color: var(--midori); }
+.direction-log li.bad { border-left-color: var(--shu); }
+.direction-at { display: inline-block; min-width: 52px; color: var(--sumi-faint); font-family: var(--mono); font-size: var(--fs-xs); }
+.direction-sub { margin: 4px 0 0 52px; color: var(--sumi-faint); font-size: var(--fs-xs); }
+.direction-warn { color: var(--shu); }
+
+/* ── 學語言模式（LanguagePanel／LinesPanel）── */
+.lang-lead { color: var(--sumi-dim, var(--sumi-faint)); margin: 0 0 12px; }
+.lang-row { margin: 14px 0; display: flex; flex-direction: column; gap: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 字幕預覽：照第三世定案的比例（1080p：原聲 48、讀音 24、母語 40）縮進 16:9 的框裡 */
+.study-frame { position: relative; width: 100%; max-width: 760px; aspect-ratio: 16 / 9; margin: 8px 0 20px;
+  background: linear-gradient(160deg, #26324a, #0e1320 70%); border: 1px solid var(--sen); container-type: inline-size; }
+.study-sub { position: absolute; left: 2%; right: 2%; bottom: 4.3%; text-align: center; }
+.study-top { color: #fff; font-size: 2.5cqw; font-weight: 700; line-height: 1.9; font-family: 'Yu Gothic', 'Meiryo', sans-serif;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 1px 1px 2px #000; }
+.study-top rt { font-size: 50%; font-weight: 600; }
+.study-bottom { color: rgb(255, 236, 170); font-size: 2.1cqw; font-weight: 700; margin-top: 0.4em;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 1px 1px 2px #000; }
+.lines-table td { vertical-align: top; }
+.lines-table tr { cursor: pointer; }
+.lines-table tr.picked td { background: var(--shu-wash); }
+.line-spoken { font-size: 1.15em; line-height: 2; }
+.line-spoken rt { font-size: 55%; color: var(--sumi-faint); }
+.line-sub { color: var(--sumi-faint); font-size: var(--fs-xs); }
+.badge.reg { margin-top: 4px; display: inline-block; }
+.line-edit { display: flex; flex-direction: column; gap: 6px; min-width: 260px; }
+.line-edit textarea, .line-edit input { width: 100%; font: inherit; padding: 4px 6px; }
+.line-edit label { display: flex; flex-direction: column; font-size: var(--fs-xs); gap: 2px; }
+.study-notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.study-note { border: 1px solid var(--sen); padding: 12px 14px; }
+.study-note-point { font-weight: 600; color: var(--shu); margin-bottom: 6px; }
+.study-note ul { margin: 4px 0 0; padding-left: 18px; }
+.study-video-row { display: inline-flex; gap: 8px; align-items: center; margin-right: 16px; flex-wrap: wrap; }
+.lang-names { width: 100%; max-width: 480px; font: inherit; padding: 6px 8px; }
+.reading-doubt { color: #c26a1b; font-size: var(--fs-xs); }
+
+/* ── 本機查證＋診斷（VerifyBlock）── */
+.verify-block { border: 1px solid var(--sen); padding: 10px 12px; margin: 8px 0; display: flex; flex-direction: column; gap: 8px; }
+.verify-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.verify-checks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); }
+.verify-checks li { display: flex; gap: 6px; }
+.verify-checks .v-icon { width: 1.2em; text-align: center; }
+.verify-checks .v-pass { color: var(--midori); }
+.verify-checks .v-warn { color: #c26a1b; }
+.verify-checks .v-fail { color: var(--shu); }
+.verify-images { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.verify-images a { display: flex; flex-direction: column; font-size: var(--fs-xs); color: var(--sumi-faint); }
+.verify-images img { width: 100%; border: 1px solid var(--sen); }
+.verify-marks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: var(--fs-xs); }
+.verify-dx { display: flex; flex-direction: column; gap: 8px; }
+.verify-pick { border-left: 3px solid var(--shu-soft); padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); }
+.verify-pick-title { font-weight: 600; color: var(--shu); }
+.verify-example { display: flex; flex-direction: column; gap: 4px; }
+.verify-example code { white-space: pre-wrap; word-break: break-all; margin-left: 6px; }
+.verify-options-head { font-weight: 600; color: var(--shu); font-size: var(--fs-xs); }
+.verify-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.verify-pick.off { opacity: 0.45; }
+.verify-pick.chosen { border-left-color: var(--midori); }
+.verify-letter { display: inline-block; min-width: 1.4em; margin-right: 6px; text-align: center; color: #fff; background: var(--shu); border-radius: 2px; }
+.verify-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.coming-soon { opacity: 0.45; filter: grayscale(1); cursor: not-allowed; }

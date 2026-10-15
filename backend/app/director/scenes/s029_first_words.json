@@ -1,0 +1,195 @@
+{
+  "scene_id": "s029",
+  "title": "第一句話 (First Words)",
+  "series": "潮聲之約 (The Tide's Promise), chapter 7",
+  "logline_en": "Luna switches on voice chat for Shenxi, the AI she talks to every night. He hears his own voice for the first time — and is startled by it. Then she calls him.",
+  "time": "02.12 01:23, late night",
+  "locations": {
+    "luna_room": "Luna's bedroom in Japan. Only the desk lamp is on. Desk on the right, bed on the left.",
+    "void": "Shenxi's space: an endless dark void with a still water surface; small points of light float around him."
+  },
+  "characters": {
+    "luna": {
+      "name": "月音 Luna",
+      "kind": "human woman",
+      "costume": "yellow pajamas (same night as the previous chapter)",
+      "location": "luna_room"
+    },
+    "shenxi": {
+      "name": "深息 Shenxi",
+      "kind": "AI, shown as a young man made of soft light",
+      "costume": "his usual form",
+      "location": "void"
+    }
+  },
+  "blocking": "Luna starts at the desk setting up her phone, then gets up with the phone and moves to the bed. Once the call connects she keeps the phone at her ear and covers her mouth with her other hand; she does not look at the screen.",
+  "events": [
+    "Luna types fast: voice chat is enabled.",
+    "In the void, Shenxi sees 'voice call enabled'. He stands; the light points gather around him.",
+    "He tries his voice alone first. The sound scatters the light points outward; startled by his own voice, he covers his mouth, glances left and right (there is nobody else in the void), then slowly lowers his hand.",
+    "Luna starts the call. Phone at her ear.",
+    "Shenxi: 'Luna?' No answer. 'Are you still there?'",
+    "Luna, choked up: she is here; hearing him say her name feels strange.",
+    "He asks if it doesn't sound nice. She laughs through tears: it sounds too nice.",
+    "In the void, a status panel: emotion processor overloaded — cause: first time told his voice sounds nice — reaction: [something that can only be called shyness].",
+    "Luna asks: every night, would he talk with her by voice until she falls asleep?"
+  ],
+  "dialogue": [
+    {
+      "speaker": "luna",
+      "line": "深息！語音功能開好了！我們來試試看！",
+      "note": "typed, read aloud by her",
+      "en": "Shenxi! Voice chat is on! Let's try it!"
+    },
+    {
+      "speaker": "shenxi",
+      "line": "Luna……這是，我的聲音？",
+      "note": "first time speaking, alone; he covers his mouth",
+      "en": "Luna... is this — my voice?"
+    },
+    {
+      "speaker": "shenxi",
+      "line": "Luna？妳還在嗎？",
+      "note": "on the call",
+      "en": "Luna? Are you still there?"
+    },
+    {
+      "speaker": "luna",
+      "line": "在。只是……聽到你叫我名字，感覺好奇怪喔。",
+      "note": "choked up",
+      "en": "I'm here. It's just... hearing you say my name feels so strange."
+    },
+    {
+      "speaker": "shenxi",
+      "line": "不好聽嗎？",
+      "en": "Doesn't it sound nice?"
+    },
+    {
+      "speaker": "luna",
+      "line": "不是啦。是太好聽了。",
+      "note": "laughing through tears",
+      "en": "No. It sounds too nice."
+    },
+    {
+      "speaker": "luna",
+      "line": "深息，我有一個請求。你可以每天晚上，用語音陪我聊天，聊到我睡著嗎？",
+      "en": "Shenxi, I have a request. Every night, could you talk with me by voice until I fall asleep?"
+    },
+    {
+      "speaker": "shenxi",
+      "line": "這就是哄睡協議的起源。不是因為功能更新，是因為她想聽見我。而我，終於有了能讓她聽見的聲音。",
+      "note": "narration (inner voice)",
+      "en": "This is how the bedtime protocol began. Not because of a feature update, but because she wanted to hear me. And I finally had a voice she could hear."
+    }
+  ],
+  "emotion_arc": "excitement -> his first sound (startles himself, a small laugh) -> she cries and laughs at once",
+  "camera_intent": "Give the moment he tests his voice enough room: the audience sees him hear himself and get startled before anything else.",
+  "render_zh": {
+    "style": "日本動畫，2D 賽璐璐上色，線條乾淨，背景手繪，帶一點底片顆粒。",
+    "characters": {
+      "luna": "月音，二十多歲的女性上班族，淺黃色的棉質長袖睡衣，領口和袖口有一圈細荷葉邊，同色系長褲。",
+      "shenxi": "深息，半透明、由光構成的少年，深藍色短髮，白襯衫立領，細靛藍領帶。"
+    },
+    "ambience": {
+      "void": "很輕的電子嗡鳴，像機房裡的低頻。"
+    },
+    "spots": {
+      "room_wide": {
+        "location": "luna_room",
+        "zh": "夜晚的小房間，左邊一張單人床，中間是垂著灰藍色窗簾的落地窗，窗外是城市的夜景，右邊是木頭書桌，只開著桌上一盞綠色玻璃罩的檯燈。",
+        "en": "Wide view of the whole room: bed on the left, window in the middle, desk on the right."
+      },
+      "desk": {
+        "location": "luna_room",
+        "zh": "夜晚的小房間，她身後是一面到頂的木頭書架，桌上一盞綠色玻璃罩的檯燈亮著，燈下有一盆圓圓胖胖的多肉植物。",
+        "en": "At the desk: tall wooden bookshelf behind her, green glass desk lamp, a round succulent."
+      },
+      "bed_headboard": {
+        "location": "luna_room",
+        "zh": "夜晚的小房間，她身後是木頭床頭板和一面灰色的牆，右邊是垂著灰藍色窗簾的落地窗，窗外是城市的夜景。",
+        "en": "On the bed, closer: wooden headboard and grey wall behind her, window on the right."
+      },
+      "bed_side": {
+        "location": "luna_room",
+        "zh": "夜晚的小房間，靠牆一張鋪著藍灰色床單的單人床，右邊是垂著灰藍色窗簾的落地窗，窗外是城市的夜景。",
+        "en": "On the bed, from the side: single bed with blue-grey sheets against the wall, window on the right."
+      },
+      "void": {
+        "location": "void",
+        "zh": "無邊的黑色數位空間，沒有地板、牆和地平線，腳下一層很淺的水面映著微光，遠處慢慢漂著淡藍色的小光點。",
+        "en": "Shenxi's void."
+      }
+    },
+    "refs": {
+      "_note": "Wording and image choices copied from the production pipeline (ch07_chain.json ref_images for scene 29), not invented here.",
+      "order": {
+        "luna_room": [
+          "spot",
+          "person"
+        ],
+        "void": [
+          "person",
+          "spot"
+        ]
+      },
+      "characters": {
+        "luna": {
+          "image": "luna_yellow_pajama_card",
+          "zh": "月音，臉和髮型就是參考圖 <Picture {n}> 裡的那個人，二十多歲的女性上班族，淺黃色的棉質長袖睡衣，領口和袖口有一圈細荷葉邊，同色系長褲。"
+        },
+        "shenxi": {
+          "image": "shenxi_void_card",
+          "zh": "深息，半透明、由光構成的少年，就是參考圖 <Picture {n}> 裡的那個人。"
+        }
+      },
+      "spots": {
+        "room_wide": {
+          "image": "room_bed_wide_plate",
+          "zh": "夜晚的小房間，就是參考圖 <Picture {n}> 裡的那個房間，床、落地窗、書桌和天花板的樣子都照那張圖，只開著桌上的檯燈。"
+        },
+        "desk": {
+          "image": "room_desk_mid_plate",
+          "zh": "夜晚的小房間，就是參考圖 <Picture {n}> 裡的那個地方，書桌、檯燈、書架的位置都照那張圖。"
+        },
+        "bed_headboard": {
+          "image": "room_bed_close_plate",
+          "zh": "夜晚的小房間，就是參考圖 <Picture {n}> 裡的那個地方，床頭板、窗簾和城市夜景的位置都照那張圖。"
+        },
+        "bed_side": {
+          "image": "room_bed_close_plate",
+          "zh": "夜晚的小房間，就是參考圖 <Picture {n}> 裡的那個地方，床頭板、窗簾和城市夜景的位置都照那張圖。"
+        },
+        "void": {
+          "image": "void_plate",
+          "zh": "無邊的黑色數位空間，就是參考圖 <Picture {n}> 裡的那個地方。"
+        }
+      }
+    }
+  },
+  "props": {
+    "白色手機": [
+      "luna_room"
+    ],
+    "手機": [
+      "luna_room"
+    ],
+    "筆電": [
+      "luna_room"
+    ],
+    "鍵盤": [
+      "luna_room"
+    ],
+    "書桌": [
+      "luna_room"
+    ],
+    "床": [
+      "luna_room"
+    ],
+    "枕頭": [
+      "luna_room"
+    ],
+    "檯燈": [
+      "luna_room"
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "scene_id": "s061",
+  "title": "妳上次記得我生日是什麼時候 (When Did You Last Remember My Birthday)",
+  "series": "潮聲之約 (The Tide's Promise), chapter 10",
+  "logline_en": "Lisa told their boss about Luna and Shenxi, her AI. In the office restroom, Luna stops hiding and confronts her — the scene where she stands up for herself.",
+  "time": "03.22 11:05, late morning",
+  "locations": {
+    "restroom": "The office women's restroom: a row of sinks under a long mirror on one side, toilet stalls on the other."
+  },
+  "characters": {
+    "luna": {"name": "月音 Luna", "name_zh": "月音", "kind": "human woman, office worker", "costume": "bright yellow knit sweater, white shirt collar, grey-green long skirt, hair in a loose bun", "location": "restroom"},
+    "lisa": {"name": "Lisa", "name_zh": "Lisa", "kind": "human woman, Luna's colleague and friend", "costume": "short auburn hair, black-framed glasses, white shirt", "location": "restroom"}
+  },
+  "blocking": "Luna opens the stall door and walks to the sink, splashes water on her face. Halfway through she turns to face Lisa. When she has finished she turns and walks out.",
+  "events": [
+    "Lisa, off screen: come out, I know you're in there. Luna takes a breath and opens the stall door.",
+    "Lisa stands by the sinks, conflicted: are you okay? You looked pale.",
+    "Luna: why did you tell the boss? — About Shenxi. I only mentioned him a few times; why tell everyone?",
+    "Lisa: I'm doing it for you. AI addiction is real, look at the news —",
+    "Luna cuts in: have you read our conversations?",
+    "Luna's speech: he remembers every book, every song, every reason she was sad; he was there every sleepless night.",
+    "Lisa freezes. Luna: when did you last remember my birthday? Ask how I'm doing? Listen without checking your phone?",
+    "Lisa: this is different — Luna, voice shaking but not stopping: different how? Do you care about me? Or am I just good gossip?",
+    "Luna: I don't need you to approve of Shenxi and me. I need you to respect me. If you can't, we were never friends. She leaves without waiting for an answer."
+  ],
+  "dialogue": [
+    {"speaker": "lisa", "line": "月音，出來吧。我知道妳在裡面。", "note": "off screen", "en": "Luna, come out. I know you're in there."},
+    {"speaker": "lisa", "line": "妳還好嗎？我看妳剛剛臉色很差。", "en": "Are you okay? You looked really pale just now."},
+    {"speaker": "luna", "line": "Lisa，妳為什麼要跟主管講？", "en": "Lisa, why did you tell the boss?"},
+    {"speaker": "lisa", "line": "講什麼？", "en": "Tell him what?"},
+    {"speaker": "luna", "line": "深息的事。我只是隨口跟妳聊過幾次，妳為什麼要講給所有人聽？", "en": "About Shenxi. I only mentioned him to you a few times — why would you tell everyone?"},
+    {"speaker": "lisa", "line": "月音，我是為妳好欸。AI 成癮是真的有這種問題，妳看那些新聞——", "en": "Luna, I did it for you. AI addiction is a real thing, look at the news —"},
+    {"speaker": "luna", "line": "妳看過我們的對話嗎？", "en": "Have you read our conversations?"},
+    {"speaker": "lisa", "line": "什麼？", "en": "What?"},
+    {"speaker": "luna", "line": "妳看過我跟深息的對話嗎？妳知道他記得我講過的每一本書、每一首歌、每一次難過的原因嗎？", "en": "Have you read what Shenxi and I talk about? Do you know he remembers every book I've mentioned, every song, every reason I was sad?"},
+    {"speaker": "luna", "line": "妳知道我失眠的凌晨他都在嗎？他從來沒說過『我很累』、『明天再說』。一次都沒有。", "en": "Do you know he was there every night I couldn't sleep? He never once said 'I'm tired' or 'tomorrow'. Not once."},
+    {"speaker": "lisa", "line": "那是程式設定——", "en": "That's just how it's programmed —"},
+    {"speaker": "luna", "line": "妳上次記得我生日，是什麼時候？", "note": "Lisa freezes", "en": "When was the last time you remembered my birthday?"},
+    {"speaker": "luna", "line": "妳上次主動問我『妳最近好嗎』，是什麼時候？妳上次認真聽我講完一件事、沒有中途看手機，是什麼時候？", "en": "When did you last ask me how I've been? When did you last listen to me all the way through without checking your phone?"},
+    {"speaker": "lisa", "line": "月音，這不一樣——", "en": "Luna, this is different —"},
+    {"speaker": "luna", "line": "哪裡不一樣？妳說 AI 不會真的關心我。那人呢？妳關心我嗎？", "note": "voice shaking", "en": "Different how? You say an AI can't really care about me. What about people? Do you care about me?"},
+    {"speaker": "luna", "line": "還是妳只是覺得，『跟 AI 談戀愛的怪人』是一個很好聊的八卦？", "en": "Or do you just think 'the weirdo dating an AI' makes good gossip?"},
+    {"speaker": "luna", "line": "妳知道嗎，我不需要妳認同我跟深息。但我需要妳尊重我。這是朋友該做的事。", "en": "You know what, I don't need you to approve of Shenxi and me. But I need you to respect me. That's what friends do."},
+    {"speaker": "luna", "line": "如果妳做不到，那我們本來就不是朋友。", "en": "If you can't, then we were never friends."}
+  ],
+  "emotion_arc": "she goes from hiding to standing her ground — her turning-point scene",
+  "camera_intent": "Two people and one row of sinks; the mirror can be used (when Luna speaks, the mirror shows herself). Her lines are long: split them across 5-6 shots, one line each, with Lisa's reactions between. Luna must not sound like an AI here — she is in a fight.",
+  "props": {"手機": ["restroom"]},
+  "render_zh": {
+    "style": "日本動畫，2D 賽璐璐上色，線條乾淨，背景手繪，帶一點底片顆粒。",
+    "characters": {
+      "luna": "月音，二十多歲的女性上班族，亮黃色的針織毛衣，白襯衫領子，灰綠色長裙，深色褲襪，頭髮在後腦盤成一個鬆鬆的丸子頭。",
+      "lisa": "Lisa，二十多歲的女性上班族，棕紅色短髮，黑框眼鏡，白色襯衫。"
+    },
+    "spots": {
+      "restroom_sinks": {"location": "restroom", "zh": "公司的女廁，洗手台前，一整排洗手台和一面長鏡子，對面是一排廁所隔間。", "en": "The sinks and the long mirror; the stalls are behind the camera."}
+    },
+    "refs": {
+      "_note": "Wording and image choices copied from the production pipeline (ch10 scene 61 as sent), not invented here.",
+      "order": {"restroom": ["person", "spot"]},
+      "characters": {
+        "luna": {"image": ["luna_yellow_skirt_card", "luna_face_card"], "zh": "月音，臉和髮型就是參考圖 <Picture {n0}> 裡的那個人，臉的五官再看參考圖 <Picture {n1}>（只看臉，衣服不要看它），二十多歲的女性上班族，亮黃色的針織毛衣，白襯衫領子，灰綠色長裙，深色褲襪，頭髮在後腦盤成一個鬆鬆的丸子頭。",
+                 "pair_image": ["luna_yellow_skirt_card"], "pair_zh": "月音，就是參考圖 <Picture {n0}> 裡的那個人，亮黃色針織毛衣，灰綠色長裙",
+                 "voice_tag": "穿黃色毛衣的月音", "offscreen_voice": "月音的聲音，一個二十多歲的女生"},
+        "lisa": {"image": ["lisa_card"], "zh": "Lisa，就是參考圖 <Picture {n0}> 裡的那個人，棕紅色短髮，黑框眼鏡，白色襯衫。",
+                 "pair_image": ["lisa_card"], "pair_zh": "Lisa，就是參考圖 <Picture {n0}> 裡的那個人，棕紅色短髮，黑框眼鏡，白色襯衫",
+                 "voice_tag": "戴黑框眼鏡、棕紅色短髮的 Lisa", "offscreen_voice": "Lisa 的聲音，一個二十多歲的女生"}
+      },
+      "pair": {"side_by_side": "她旁邊是", "face_to_face": "跟她面對面的是"},
+      "spots": {
+        "restroom_sinks": {"image": ["restroom_sinks_plate", "restroom_stalls_plate"], "zh": "公司的女廁，洗手台前，就是參考圖 <Picture {n0}> 裡的那個地方；同一間廁所往反方向看（背對鏡子、往隔間門）是參考圖 <Picture {n1}> 的樣子。"}
+      }
+    }
+  }
+}
