@@ -169,6 +169,28 @@ def say(line: dict, film: str, table: dict[str, str]) -> str:
     return text
 
 
+def write_dialogue(sg, directed: bool) -> None:
+    """把分鏡表裡送影片模型唸的台詞換成導過的版本（directed=True）或劇本原句（False）。
+    關掉學語言模式／換影片語言時要換回原句，不然一般生成照樣唸舊的外語台詞。"""
+    keep = {(ln["shot_id"], ln.get("k", 0)): ln for ln in sg.lines}
+    if not keep or not sg.shot_list:
+        return
+
+    def pick(ln: dict) -> str:
+        return (ln.get("say") or ln.get("spoken") or "") if directed else (ln.get("source") or "")
+
+    for shot in sg.shot_list.shots:
+        if shot.dialogue_lines:
+            for k, d in enumerate(shot.dialogue_lines):
+                ln = keep.get((shot.shot_id, k))
+                if ln and pick(ln):
+                    d["text"] = pick(ln)
+            if shot.dialogue:
+                shot.dialogue = "　".join(d.get("text", "") for d in shot.dialogue_lines)
+        elif shot.dialogue and (shot.shot_id, 0) in keep and pick(keep[(shot.shot_id, 0)]):
+            shot.dialogue = pick(keep[(shot.shot_id, 0)])
+
+
 def apply(project_id: str, order: int, results: list[dict], notes: list[dict], usage: dict) -> None:
     """結果存進段落、導過的台詞寫回分鏡表（H3 唸這個）；舊字幕快取作廢。"""
     st0 = project_store.get_store().load(project_id)

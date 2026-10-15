@@ -3,7 +3,7 @@
  * 每一步都照作者本機影片管線實測過的做法（放大的圖、混合比例、轉場「不吃口白」、字幕照聽寫時間）。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { Lang } from '../api'
+import { send, type Lang } from '../api'
 
 type LogEntry = { t: number; kind: string; [k: string]: unknown }
 type State = { status: string | null; log: LogEntry[]; outputs: string[]; shots_ready: number }
@@ -58,6 +58,7 @@ const STEP_OF: Record<string, number> = { start: 0, trim: 0, upscale: 1, transit
 export function FinishPanel({ lang, projectId, order }: { lang: Lang; projectId: string; order: number }) {
   const t = T[lang]
   const [st, setSt] = useState<State | null>(null)
+  const [err, setErr] = useState('')
   const alive = useRef(true)
   const base = `/api/projects/${projectId}/segments/${order}/finish`
   const poll = async () => {
@@ -73,15 +74,24 @@ export function FinishPanel({ lang, projectId, order }: { lang: Lang; projectId:
   if (!st) return null
   const last = st.log[st.log.length - 1]
   const step = last ? (STEP_OF[last.kind] ?? 0) : -1
-  const start = async () => { await fetch(base, { method: 'POST' }); void poll() }
+  const start = async () => {
+    setErr('')
+    try {
+      await send(base, { method: 'POST' })
+    } catch (e) {
+      setErr((e as Error).message)
+    }
+    void poll()
+  }
 
   return (
     <section className="section">
       <div className="section-head">
         <h2>{t.title}</h2>
-        {st.status && <span className={`badge ${st.status === 'done' ? 'done' : st.status === 'failed' ? 'over' : 'in-progress'}`}>
-          {st.status === 'done' ? t.done : st.status === 'failed' ? t.failed : t.running}</span>}
+        {st.status && <span className={`badge ${st.status === 'done' ? 'done' : (st.status === 'failed' || st.status === 'interrupted') ? 'over' : 'in-progress'}`}>
+          {st.status === 'done' ? t.done : (st.status === 'failed' || st.status === 'interrupted') ? t.failed : t.running}</span>}
       </div>
+      {err && <div className="notice warn">{err}</div>}
       <p className="lang-lead">{t.lead}</p>
       {st.log.length > 0 && (
         <ol className="direction-steps">

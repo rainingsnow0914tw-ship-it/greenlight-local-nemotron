@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 import uuid
 
@@ -195,7 +196,14 @@ def duplicate_project(project_id: str, payload: dict | None = None) -> dict:
     new_id = f"p-{uuid.uuid4().hex[:10]}"
     suffix = (payload or {}).get("title") if payload else None
 
-    fresh = ProjectState(project_id=new_id, title=suffix or f"{source.title}（新版本）")
+    # 新版本再開新版本：不要疊成「（新版本）（新版本）」，改成編號（新版本 2、3…）
+    base = re.sub(r"（新版本(?: \d+)?）$", "", source.title)
+    store = project_store.get_store()
+    taken = {s.title for s in (store.load(i) for i in store.list_ids()) if s}
+    n = 1
+    while (f"{base}（新版本）" if n == 1 else f"{base}（新版本 {n}）") in taken:
+        n += 1
+    fresh = ProjectState(project_id=new_id, title=suffix or (f"{base}（新版本）" if n == 1 else f"{base}（新版本 {n}）"))
     # 只帶「已經花錢買到、而且跟後續選擇無關」的東西。
     fresh.script_text = source.script_text
     fresh.screenplay = source.screenplay
@@ -873,6 +881,7 @@ def plan_shots(project_id: str, order: int, force: bool = False) -> dict:
             ),
         )
         segment.shot_list = None
+        segment.clear_line_direction()   # 舊分鏡的台詞導演結果作廢
 
     try:
         shot_list, usage = shot_planner.plan_segment(
@@ -895,6 +904,7 @@ def plan_shots(project_id: str, order: int, force: bool = False) -> dict:
     # 設好 shot_list，段落狀態自己就是 SHOTS_PLANNED ——
     # status 是推導的 property，不用（也不能）在這裡指定。
     segment.shot_list = shot_list
+    segment.clear_line_direction()       # 新分鏡：舊的台詞導演結果作廢（鏡號會重複）
     segment.spent_usd += usage["cost_usd"]
     state.spend.llm_usd += usage["cost_usd"]
     if state.stage.order < Stage.SHOTS_PLANNED.order:

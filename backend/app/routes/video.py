@@ -516,7 +516,11 @@ def _ensure_clips(segment: Segment) -> list:
 
     if rec and rec.uri:
         for c in segment.clips:
-            if c.shot_id == rec.shot_id and not c.uri:
+            # 批次還沒有檔案 → 併入；或試拍重拍過、比批次那條新、批次那條還沒通過 → 換成新的一條
+            #    （不換的話試拍卡上的按鈕會作用在舊的那一條：重查、診斷、套修法都對錯對象）
+            newer = bool(c.uri) and c.uri != rec.uri and (rec.generated_at or "") > (c.generated_at or "") \
+                and c.status is not ClipStatus.APPROVED
+            if c.shot_id == rec.shot_id and (not c.uri or newer):
                 c.uri = rec.uri
                 c.seconds = rec.seconds
                 c.width, c.height = rec.width, rec.height

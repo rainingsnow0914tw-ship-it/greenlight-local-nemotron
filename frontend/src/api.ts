@@ -5,6 +5,20 @@
  * 換語言不用重打 API（見 backend/app/services/i18n.py 的說明）。
  */
 
+/** 送出請求；伺服器回錯誤就丟出它說的原因（detail），讓畫面顯示，不要默默吞掉。 */
+export async function send(url: string, init?: RequestInit): Promise<void> {
+  const r = await fetch(url, init)
+  if (r.ok) return
+  let msg = `${r.status} ${r.statusText}`
+  try {
+    const j = await r.json()
+    if (j?.detail) msg = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail)
+  } catch {
+    /* 回應不是 JSON：用狀態碼 */
+  }
+  throw new Error(msg)
+}
+
 export type Lang = 'zh' | 'en' | 'ja'
 
 /** 後端回的雙／三語欄位。缺的語言會自動退回中文。 */

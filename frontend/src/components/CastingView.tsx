@@ -16,6 +16,7 @@
  */
 
 import { Icon } from './Icons'
+import { sysText } from '../sysText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   castingApi,
@@ -153,7 +154,7 @@ export function CastingView({ copy, lang, projectId, onError, onGateChange }: Pr
             {gate.characters_locked} / {gate.characters_total} {copy.castingProgress}
           </span>
           <span className="casting-gate-msg">
-            {gate.can_proceed ? copy.castingReady : gate.blocked_reason}
+            {gate.can_proceed ? copy.castingReady : sysText(gate.blocked_reason, lang)}
           </span>
           <span className="casting-gate-spent">
             ${gate.total_spent_usd.toFixed(2)}
@@ -533,7 +534,7 @@ function CharacterPanel({
 
       {session.budget_notice.level !== 'none' && (
         <p className={`casting-notice ${session.budget_notice.level}`}>
-          {session.budget_notice.message}
+          {sysText(session.budget_notice.message, lang)}
         </p>
       )}
 

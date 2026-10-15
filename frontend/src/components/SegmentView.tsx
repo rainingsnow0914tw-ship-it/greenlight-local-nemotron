@@ -10,6 +10,7 @@
  */
 
 import { Icon } from './Icons'
+import { sysText } from '../sysText'
 import { useCallback, useEffect, useState } from 'react'
 import {
   api,
@@ -573,7 +574,7 @@ export function SegmentView({
             <>
               {shots.shot_list.planning_notes.map((n, i) => (
                 <div className={`notice ${n.startsWith('⚠') ? 'warn' : ''}`} key={i}>
-                  {n}
+                  {sysText(n, lang)}
                 </div>
               ))}
             </>

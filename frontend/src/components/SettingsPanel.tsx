@@ -31,7 +31,7 @@ const T = {
     ready: '可以生影片', canInstall: '缺的東西可以一鍵安裝', cannot: '這台電腦跑不動本機影片（可以改用雲端引擎）',
     keys: '你的金鑰', keysNote: '金鑰只存在你的電腦裡', encrypted: '（Windows 加密）', plain: '（未加密）',
     nebius: 'Nebius（Nemotron：寫分鏡、導演、製作人）', google: 'Google（看圖、聽聲音、雲端影片）',
-    save: '存起來', remove: '刪掉', test: '驗證', testing: '驗證中…', saved: '已存，末四碼', none: '還沒填',
+    save: '存起來', remove: '刪掉', removeAsk: '確定要刪掉這把金鑰？刪掉之後要重新貼上才能用。', test: '驗證', testing: '驗證中…', saved: '已存，末四碼', none: '還沒填',
     testOk: (n: number, k: number) => `可以用：平台列出 ${n} 個模型，其中 Nemotron ${k} 個`,
     roles: '每一步用哪個 AI', rolesNote: 'Nemotron 只看得懂文字；要看圖、聽聲音的步驟請用 Google。',
     engine: '影片引擎', local: '本機（你的顯示卡）', cloud: '雲端（你的 Google 金鑰）', comfy: 'ComfyUI 位址', soon: 'Coming soon',
@@ -50,7 +50,7 @@ const T = {
     ready: 'Ready to make video', canInstall: 'Missing pieces can be installed in one click', cannot: 'This computer cannot run the local video engine (use the cloud engine instead)',
     keys: 'Your keys', keysNote: 'Keys stay on this computer', encrypted: '(Windows-encrypted)', plain: '(not encrypted)',
     nebius: 'Nebius (Nemotron: shot lists, director, producer)', google: 'Google (images, audio, cloud video)',
-    save: 'Save', remove: 'Remove', test: 'Test', testing: 'Testing…', saved: 'Saved, ends in', none: 'Not set',
+    save: 'Save', remove: 'Remove', removeAsk: 'Remove this key? You will need to paste it again to use it.', test: 'Test', testing: 'Testing…', saved: 'Saved, ends in', none: 'Not set',
     testOk: (n: number, k: number) => `Works: the platform lists ${n} models, ${k} of them Nemotron`,
     roles: 'Which AI does each step', rolesNote: 'Nemotron reads text only; steps that look at images or listen to audio need Google.',
     engine: 'Video engine', local: 'Local (your GPU)', cloud: 'Cloud (your Google key)', comfy: 'ComfyUI address', soon: 'Coming soon',
@@ -69,14 +69,14 @@ const T = {
     ready: '動画を作れます', canInstall: '足りないものはワンクリックで入れられます', cannot: 'このPCではローカル動画は動きません（クラウドエンジンをお使いください）',
     keys: 'あなたのキー', keysNote: 'キーはこのPCの中だけに保存されます', encrypted: '（Windows で暗号化）', plain: '（暗号化なし）',
     nebius: 'Nebius（Nemotron：絵コンテ・監督・プロデューサー）', google: 'Google（画像・音声・クラウド動画）',
-    save: '保存', remove: '削除', test: '確認', testing: '確認中…', saved: '保存済み・末尾', none: '未設定',
+    save: '保存', remove: '削除', removeAsk: 'このキーを削除しますか？使うには再度貼り付けが必要です。', test: '確認', testing: '確認中…', saved: '保存済み・末尾', none: '未設定',
     testOk: (n: number, k: number) => `使えます：${n} モデル中 Nemotron ${k} 個`,
     roles: '各ステップの担当 AI', rolesNote: 'Nemotron は文字のみ。画像を見る・音声を聞くステップは Google にしてください。',
     engine: '動画エンジン', local: 'ローカル（あなたのGPU）', cloud: 'クラウド（あなたの Google キー）', comfy: 'ComfyUI のアドレス', soon: 'Coming soon',
     status: { ok: 'OK', warn: '未検証', block: '不可', missing: '不足' },
     install: '動画エンジンをワンクリックで導入', installNote: '公式 ComfyUI ポータブル版（約 2GB）と動画モデル（約 42GB）をダウンロードします。モデルのフォルダーがあれば入力すると再ダウンロードしません。',
     license: '動画モデル MiniMax H3 のライセンス対象外の地域：', licenseRead: 'ライセンス全文', accept: 'ライセンスを読み、これらの地域では使用しません',
-    browse: '参照…', open: 'フォルダーを開く', storage: '保存場所', dataDir: '作品フォルダー（プロジェクト・画像・動画・学習記録）', exportDir: '完成動画の出力先（完成した動画のコピーをここに保存）', free: '空き', change: '変更', moveAsk: '既存の作品も新しい場所へ移しますか？（キャンセル＝新しい場所は空から、古い作品は元の場所に残ります）', moved: '移動しました',
+    browse: '参照…', open: 'フォルダを開く', storage: '保存場所', dataDir: '作品フォルダー（プロジェクト・画像・動画・学習記録）', exportDir: '完成動画の出力先（完成した動画のコピーをここに保存）', free: '空き', change: '変更', moveAsk: '既存の作品も新しい場所へ移しますか？（キャンセル＝新しい場所は空から、古い作品は元の場所に残ります）', moved: '移動しました',
     target: 'インストール先', reuse: '既存のモデルフォルダー（任意）', installBtn: 'インストール', installing: 'インストール中…', installDone: '完了', installFailed: '停止しました',
     img: '画像モデル（キャスティング・キャラ表・最初のフレーム用）', imgNote: 'Qwen-Image 2512 —— あなたの ComfyUI に直接ダウンロードします。ComfyUI を操作する必要はありません。商用利用可（Apache 2.0）。既にあるファイルはスキップ、中断したらもう一度押せば続きから。',
     imgAccept: 'このモデルのライセンス（Apache 2.0）を読み、同意します', imgWhere: 'ComfyUI が起動していないため保存先を聞けません —— ComfyUI の models フォルダー（diffusion_models、loras… が入っている）を選んでください',
@@ -93,7 +93,7 @@ const NEMOTRON = [
 const BADGE: Record<Check['status'], string> = { ok: 'done', warn: 'in-progress', block: 'over', missing: 'not-started' }
 
 /** 機器檢查的項目名稱與建議（後端給 id 和英文；畫面照使用者選的語言顯示。數字、型號是資料，原樣顯示）。 */
-const CHECK_TEXT: Record<Lang, Record<string, { label: string; fix?: Partial<Record<Check['status'], string>> }>> = {
+const CHECK_TEXT: Record<Lang, Record<string, { label: string; fix?: Partial<Record<Check['status'], string>>; detail?: Partial<Record<Check['status'], string>> }>> = {
   zh: {
     os: { label: 'Windows 64 位元', fix: { block: '本機影片目前只支援 Windows；雲端版開發中。' } },
     gpu: { label: 'NVIDIA 顯示卡', fix: { block: '需要至少 24 GB 顯存的 NVIDIA 顯示卡；雲端版開發中。' } },
@@ -106,6 +106,7 @@ const CHECK_TEXT: Record<Lang, Record<string, { label: string; fix?: Partial<Rec
     comfyui: { label: 'ComfyUI 影片引擎', fix: { missing: '在 app 裡一鍵安裝，或啟動你自己的 ComfyUI 並填它的位址。' } },
     nodes: { label: '管線節點', fix: { missing: '請更新 ComfyUI（新版內建 MiniMax H3 節點）。' } },
     model: { label: '模型', fix: { missing: '安裝時會從 Hugging Face 下載，並核對校驗碼。' } },
+    verify_tools: { label: '生成後查證工具', detail: { ok: '語音辨識、假名讀音、拼音都可以用' } },
   },
   en: {},
   ja: {
@@ -119,6 +120,7 @@ const CHECK_TEXT: Record<Lang, Record<string, { label: string; fix?: Partial<Rec
     ffmpeg: { label: 'ffmpeg（つなぎ用）', fix: { missing: 'インストール時に一緒に入れます。' } },
     comfyui: { label: 'ComfyUI 動画エンジン', fix: { missing: 'アプリからワンクリックで入れるか、ご自分の ComfyUI のアドレスを入れてください。' } },
     nodes: { label: 'パイプラインのノード', fix: { missing: 'ComfyUI を更新してください（MiniMax H3 ノードは新しい版に内蔵）。' } },
+    verify_tools: { label: '生成後の検証ツール', detail: { ok: '音声認識・かな読み・ピンインが使えます' } },
     model: { label: 'モデル', fix: { missing: 'インストール時に Hugging Face から取得し、チェックサムを確認します。' } },
   },
 }
@@ -126,12 +128,12 @@ const CHECK_TEXT: Record<Lang, Record<string, { label: string; fix?: Partial<Rec
 /** 「每一步用哪個 AI」的步驟名稱（後端給的是內部角色代號）。 */
 const ROLE_TEXT: Record<Lang, Record<string, string>> = {
   zh: { parse: '解析劇本', segment: '分段', staging: '場面調度（站位、道具）', director: '分鏡（導演）', prompts: '寫提示詞', screening: '內容預審',
-        subtitles: '翻譯字幕', learning: '提煉經驗', frame_review: '看片檢核（要看圖）', voice: '分析音色（要聽聲音）', character: '角色外貌與聲音描述', casting: '生角色圖（沒有生圖模型就只出文字描述）', lines: '台詞導演（學語言模式：口語、讀音、雙語字幕）', doctor: '查證診斷（生完沒過：對照症狀庫找原因、提修法）' },
+        subtitles: '翻譯字幕', learning: '提煉經驗', frame_review: '看片檢核（要看圖）', voice: '分析音色（要聽聲音）', character: '角色外貌與聲音描述', casting: '生角色圖（沒有生圖模型就只出文字描述）', lines: '台詞導演（學語言模式：口語、讀音、雙語字幕）', critic: '台詞審稿（學語言模式：對照原文抓意思跑掉的句子）', doctor: '查證診斷（生完沒過：對照症狀庫找原因、提修法）' },
   en: { parse: 'Read the script', segment: 'Split into parts', staging: 'Staging (spots, props)', director: 'Shot list (director)', prompts: 'Write prompts',
         screening: 'Content check', subtitles: 'Translate subtitles', learning: 'Learn from past runs',
-        frame_review: 'Review frames (sees images)', voice: 'Voice profile (hears audio)', character: 'Character looks & voice (text)', casting: 'Character images (text-only if no image model)', lines: 'Line director (study mode: spoken register, readings, dual subtitles)', doctor: 'Check diagnosis (failed checks → symptom library → fix)' },
+        frame_review: 'Review frames (sees images)', voice: 'Voice profile (hears audio)', character: 'Character looks & voice (text)', casting: 'Character images (text-only if no image model)', lines: 'Line director (study mode: spoken register, readings, dual subtitles)', critic: 'Line review (study mode: lines whose meaning drifted from the source)', doctor: 'Check diagnosis (failed checks → symptom library → fix)' },
   ja: { parse: '台本の解析', segment: '分割', staging: '段取り（立ち位置・小道具）', director: '絵コンテ（監督）', prompts: 'プロンプト作成', screening: '内容チェック',
-        subtitles: '字幕の翻訳', learning: '経験の抽出', frame_review: 'フレーム確認（画像を見る）', voice: '声の分析（音声を聞く）', character: 'キャラクターの外見と声（テキスト）', casting: 'キャラクター画像（画像モデルがなければテキストのみ）', lines: 'セリフ演出（学習モード：口語・読み・二言語字幕）', doctor: '検証の診断（不合格 → 症状ライブラリ → 修正案）' },
+        subtitles: '字幕の翻訳', learning: '経験の抽出', frame_review: 'フレーム確認（画像を見る）', voice: '声の分析（音声を聞く）', character: 'キャラクターの外見と声（テキスト）', casting: 'キャラクター画像（画像モデルがなければテキストのみ）', lines: 'セリフ演出（学習モード：口語・読み・二言語字幕）', critic: 'セリフの確認（学習モード：原文と意味がずれた行）', doctor: '検証の診断（不合格 → 症状ライブラリ → 修正案）' },
 }
 
 function checkText(lang: Lang, c: Check): { label: string; fix: string } {
@@ -271,7 +273,7 @@ export function SettingsPanel({ lang }: { lang: Lang }) {
                   <tr key={c.id}>
                     <td><span className={`badge ${BADGE[c.status]}`}>{t.status[c.status]}</span></td>
                     <td>{ct.label}</td>
-                    <td>{c.detail}{ct.fix && <div style={{ color: 'var(--sumi-faint)', marginTop: 4 }}>→ {ct.fix}</div>}</td>
+                    <td>{CHECK_TEXT[lang][c.id]?.detail?.[c.status] ?? c.detail}{ct.fix && <div style={{ color: 'var(--sumi-faint)', marginTop: 4 }}>→ {ct.fix}</div>}</td>
                   </tr>
                 )
               })}
@@ -407,7 +409,7 @@ export function SettingsPanel({ lang }: { lang: Lang }) {
                   onChange={(e) => setDraft({ ...draft, [p]: e.target.value })} className="settings-input" />
                 <button className="btn small primary" disabled={!draft[p]} onClick={() => void saveKey(p, draft[p])}>{t.save}</button>
                 {k?.set && <button className="btn small" onClick={() => void test(p)}>{r === 'running' ? t.testing : t.test}</button>}
-                {k?.set && <button className="btn small ghost" onClick={() => void saveKey(p, '')}>{t.remove}</button>}
+                {k?.set && <button className="btn small ghost" onClick={() => { if (window.confirm(t.removeAsk)) void saveKey(p, '') }}>{t.remove}</button>}
               </div>
               {r && r !== 'running' && (
                 <div className={`notice ${r.ok ? '' : 'warn'}`} style={{ marginTop: 8 }}>

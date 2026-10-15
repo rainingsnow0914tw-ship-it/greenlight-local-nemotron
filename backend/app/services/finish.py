@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
+import shutil
 import tempfile
 import threading
 import time
@@ -69,6 +70,8 @@ def probe(path: Path) -> tuple[int, int, float, float]:
     m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", err)
     t = re.search(r"Duration: (\d+):(\d+):([\d.]+)", err)
     f = re.search(r"([\d.]+) fps", err)
+    if not m or not t:   # ffmpeg 讀不到這個檔：講清楚是哪個檔、ffmpeg 說什麼（不要只丟 NoneType）
+        raise RuntimeError(f"ffmpeg cannot read {path.name}: {err.strip()[-300:]}")
     return (int(m.group(1)), int(m.group(2)),
             int(t.group(1)) * 3600 + int(t.group(2)) * 60 + float(t.group(3)), float(f.group(1)) if f else 24.0)
 
@@ -155,6 +158,7 @@ def _upscale_comfy(src: Path, dst: Path, tw: int, th: int, project_id: str, say,
 
 def _run(project_id: str, order: int) -> None:
     store = project_store.get_store()
+    work = None
     try:
         state = store.load(project_id)
         seg = _seg(state, order)
@@ -233,11 +237,11 @@ def _run(project_id: str, order: int) -> None:
         total = probe(master)[2]
         outputs = {"master": media_store.save(project_id, f"part{order}_master", master.read_bytes(), "video/mp4")}
         _log(project_id, order, "assembled", shots=len(ready), seconds=round(total, 1))
-        # ⑤ 燒字幕（學語言模式）
+        # ⑤ 燒字幕（學語言模式）。字幕時間有台詞就算、存起來：之後對這支成片燒字幕／下載字幕檔要用同一份
+        items = _cues(seg, ready, state.film_language) if seg.lines else []
         if state.study_mode and seg.lines:
             from ..language import study_subs
 
-            items = _cues(seg, ready, state.film_language)
             for lang in [x for x in state.learner_languages if x != state.film_language]:
                 _log(project_id, order, "subtitles", lang=lang, lines=len(items))
                 out = work / f"study_{lang}.mp4"
@@ -247,7 +251,7 @@ def _run(project_id: str, order: int) -> None:
 
         def done(st):
             sg = _seg(st, order)
-            sg.finish_outputs, sg.finish_status = outputs, "done"
+            sg.finish_outputs, sg.finish_status, sg.finish_cues = outputs, "done", items
             sg.output_uri, sg.output_seconds = outputs["master"], total   # 原本的「接片完成」狀態一起成立
             st.record_decision(choice=f"第 {order} 段成片：{len(ready)} 鏡、{total:.0f} 秒",
                                rationale="剪頭→放大→轉場→接片→燒字幕")
@@ -258,6 +262,10 @@ def _run(project_id: str, order: int) -> None:
         logger.exception("finish failed")
         _log(project_id, order, "failed", error=f"{type(exc).__name__}: {str(exc)[:300]}")
         store.mutate(project_id, lambda st: setattr(_seg(st, order), "finish_status", "failed"))
+    finally:
+        # 剪頭／放大／正規化／接片的中間檔：產出都已存進媒體庫，暫存資料夾一律清掉（一段可以到好幾 GB）
+        if work is not None:
+            shutil.rmtree(work, ignore_errors=True)
 
 
 def _cues(seg, ready, film: str) -> list[dict]:

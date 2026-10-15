@@ -34,6 +34,10 @@ def after_generate(state, segment, shot, record, prompt: str, take_name: str) ->
     if not path or not path.exists():
         return 0.0
     film = (segment.shot_list.film_language if segment.shot_list else None) or state.film_language or "zh"
+    # 新的一次（重拍沿用同一筆紀錄）先清掉上一次的結果：舊診斷、舊剪頭秒數、舊查證警告都不能帶到新的這一條
+    #    （不清的話：新的過了還掛著舊診斷；新的查證壞了，成片會照舊秒數剪新的這一條）
+    record.verify, record.diagnosis, record.trim_head = {}, {}, 0.0
+    record.warnings = [w for w in record.warnings if "查證" not in w]
     try:
         v = checks.run(str(path), say=spoken_text(shot), film=film, voice_role=shot.voice_role,
                        save=lambda name, data, mime: media_store.save(state.project_id, f"{take_name}_{name}", data, mime))
@@ -58,9 +62,15 @@ def diagnose_into(state, segment, shot, record) -> float:
     from . import doctor
 
     v = record.verify or {}
-    dx = doctor.diagnose({"shot_id": shot.shot_id, "speaker": shot.speaker, "voice_role": shot.voice_role,
-                          "seconds": shot.total_seconds, "performance": shot.performance},
-                         v.get("prompt", ""), v, v.get("marks", []), doctor.controls_from(segment, shot.shot_id))
+    try:
+        dx = doctor.diagnose({"shot_id": shot.shot_id, "speaker": shot.speaker, "voice_role": shot.voice_role,
+                              "seconds": shot.total_seconds, "performance": shot.performance},
+                             v.get("prompt", ""), v, v.get("marks", []), doctor.controls_from(segment, shot.shot_id))
+    except Exception as exc:  # noqa: BLE001 - 診斷壞了不能讓已經生好的這一鏡跟著丟掉：記下來、照常存檔
+        logger.exception("diagnosis failed")
+        record.diagnosis = {"picks": [], "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+        record.warnings.append(f"查證診斷失敗（影片已保存）：{type(exc).__name__}")
+        return 0.0
     # 現在的表演句與台詞一起存：並列的修法裡「改表演句／改台詞」那幾個，畫面要拿來預填讓人改
     dx["current"] = {"performance": shot.performance or shot.description or "", "line": spoken_text(shot)}
     record.diagnosis = dx

@@ -60,9 +60,11 @@ def observe(project_id: str, order: int, shot_id: str, payload: dict):
         raise HTTPException(409, "this clip has not been checked yet")
     marks = [m for m in rec.verify.get("marks", []) if m not in ("嘴沒動", "嘴有動") or mark not in ("嘴沒動", "嘴有動")]
     rec.verify["marks"] = marks + [mark]
-    if mark == "嘴有動":
-        rec.diagnosis = {}          # 人看過說沒問題：不診斷
+    if mark == "嘴有動" and (rec.verify or {}).get("passed", True) and not any(
+            c["level"] == "warn" for c in rec.verify.get("checks", [])):
+        rec.diagnosis = {}          # 人看過說嘴有動、其他項目也都過：不用診斷
     else:
+        # 其他項目還有沒過的（開頭亂語、講完太短…）：重新診斷，「嘴有動」只是拿掉對嘴那條候選，不是整個清空
         cost = service.diagnose_into(state, seg, shot, rec)
         state.spend.llm_usd += cost
     _save(state, seg, rec)
@@ -80,6 +82,14 @@ def fix(project_id: str, order: int, shot_id: str, payload: dict):
         picks[i]["new_text"] = str(payload["text"]).strip()
     if picks[i]["action"] in ("edit_performance", "edit_line") and not (picks[i].get("new_text") or "").strip():
         raise HTTPException(409, "write the new performance / line first — this option has no suggested text yet")
+    if picks[i]["action"] == "edit_line":
+        # 改台詞只能安全地改「一鏡一句」：兩句的鏡塞一句進去會把誰講什麼弄亂；
+        #    學語言模式的台詞有讀音、字幕、送模型的版本三份，要在台詞表一起改才不會對不上
+        if len(shot.dialogue_lines or []) > 1:
+            raise HTTPException(409, f"this shot has {len(shot.dialogue_lines)} lines — edit them in the shot list instead")
+        if state.study_mode and seg.lines:
+            raise HTTPException(409, "study mode: edit this line in the line director table above, so the readings "
+                                     "and subtitles change with it")
     if picks[i]["action"] == "edit_performance" and any(q in picks[i]["new_text"] for q in "「」『』"):
         # 表演句只寫動作；台詞寫進表演句會被唸兩次（作者 H3 六行寫法：台詞是獨立的一行）
         raise HTTPException(409, "the performance sentence must describe actions only — keep the dialogue out of it")

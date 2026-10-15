@@ -9,6 +9,7 @@
  */
 
 import { Icon } from './Icons'
+import { SEGMENT_STATUS } from '../sysText'
 import { useCallback, useEffect, useState } from 'react'
 import {
   api,
@@ -298,7 +299,7 @@ export function ProjectView({
                   <p className="segment-title">{s.title}</p>
                   <p className="segment-synopsis">{s.synopsis}</p>
                   <span className={`badge ${s.status === 'done' ? 'done' : 'not-started'}`}>
-                    {s.status_label}
+                    {SEGMENT_STATUS[s.status]?.[lang] ?? s.status_label}
                   </span>
                 </div>
                 <div className="segment-meta">

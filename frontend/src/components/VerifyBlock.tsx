@@ -6,7 +6,7 @@
  * 沒過的時候 agent 只能從症狀庫挑原因、而且要引用證據，修法附實測出處與提示詞改前改後。
  */
 import { useState } from 'react'
-import type { Lang } from '../api'
+import { send, type Lang } from '../api'
 
 type Check = { id: string; level: 'pass' | 'warn' | 'fail' | 'look'; value: number | null; zh: string; en: string; ja: string }
 // 診斷裡給人看的字是 {zh, en}（舊紀錄是純字串）：照畫面語言挑，日文沒有就退回英文
@@ -85,14 +85,18 @@ export function VerifyBlock({ lang, projectId, order, shotId, verify, diagnosis,
   const t = T[lang]
   const sep = lang === 'en' ? ': ' : '：'
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
   if (!verify || !verify.checks) return null
   const checks = verify.checks
   const base = `/api/projects/${projectId}/segments/${order}/clips/${shotId}`
   const post = async (path: string, body: object) => {
     setBusy(true)
+    setErr('')
     try {
-      await fetch(`${base}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      await send(`${base}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       onChanged()
+    } catch (e) {
+      setErr((e as Error).message)
     } finally {
       setBusy(false)
     }
@@ -105,6 +109,7 @@ export function VerifyBlock({ lang, projectId, order, shotId, verify, diagnosis,
         <strong>{t.title}</strong>
         <span className={`badge ${verify.passed ? 'done' : 'over'}`}>{verify.passed ? t.passed : t.failed}</span>
       </div>
+      {err && <div className="notice warn">{err}</div>}
       <ul className="verify-checks">
         {checks.map((c, i) => <li key={i} className={`v-${c.level}`}><span className="v-icon">{icon(c.level)}</span>{c[lang] || c.zh}</li>)}
       </ul>
@@ -170,6 +175,7 @@ export function VerifyBlock({ lang, projectId, order, shotId, verify, diagnosis,
               )
             })}
           </div>
+          {err && <div className="notice warn">{err}</div>}
         </div>
       )}
     </div>

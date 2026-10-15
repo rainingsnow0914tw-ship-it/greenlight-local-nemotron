@@ -12,7 +12,10 @@
 from __future__ import annotations
 
 import logging
+import shutil
+import tempfile
 import threading
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
@@ -64,6 +67,7 @@ def set_languages(project_id: str, payload: dict):
             raise HTTPException(400, "pick at least one subtitle language")
 
     def fn(st):
+        was_study, was_film = st.study_mode, st.film_language
         if "study_mode" in payload:
             st.study_mode = bool(payload["study_mode"])
         if film is not None:
@@ -75,6 +79,17 @@ def set_languages(project_id: str, payload: dict):
         # 字幕語言跟原聲一樣沒有意義（日文片配日文字幕＝上下兩行一樣）
         st.learner_languages = [x for x in st.learner_languages if x != st.film_language] or (
             ["en"] if st.film_language != "en" else ["zh"])
+        # 台詞導演把導過的外語台詞寫進了分鏡表（送影片模型唸的那份）：切換時要跟著換
+        for sg in st.segments:
+            if not sg.lines:
+                continue
+            if st.film_language != was_film:          # 換了語言：舊語言導的全部作廢，分鏡表換回原句
+                jobs.write_dialogue(sg, directed=False)
+                sg.clear_line_direction()
+            elif was_study and not st.study_mode:     # 關掉：換回原句（導過的留著，再打開會寫回去）
+                jobs.write_dialogue(sg, directed=False)
+            elif st.study_mode and not was_study:     # 再打開：寫回導過的版本
+                jobs.write_dialogue(sg, directed=True)
 
     project_store.get_store().mutate(project_id, fn)
     return get_languages(project_id)
@@ -97,21 +112,33 @@ def lines_state(project_id: str, order: int, since: int = 0):
         pending = sum(1 for s in seg.shot_list.shots if s.dialogue or s.dialogue_lines)
     return {
         "study_mode": state.study_mode,
-        "status": "running" if jobs.is_running(project_id, order) else seg.lines_status,
+        # 存檔寫著 running、執行緒卻不在（跑到一半 app 被關掉）＝中斷：回報 interrupted，畫面才會再給「開始」鈕
+        "status": "running" if jobs.is_running(project_id, order) else
+                  ("interrupted" if seg.lines_status == "running" else seg.lines_status),
         "log": seg.lines_log[since:], "total": len(seg.lines_log),
         "lines": seg.lines, "notes": seg.study_notes,
         "film_language": state.film_language,
         "learner_languages": [x for x in state.learner_languages if x != state.film_language],
         "has_shot_list": seg.shot_list is not None, "shots_with_dialogue": pending,
         "has_video": bool(seg.output_uri),
-        "study_videos": {k: {**v, "running": (project_id, order, k) in _burning and _burning[(project_id, order, k)].is_alive()}
-                         for k, v in seg.study_videos.items()},
+        "study_videos": {k: _burn_state(project_id, order, k, v) for k, v in seg.study_videos.items()},
     }
 
 
 @router.patch("/{project_id}/segments/{order}/lines/{line_id}")
 def edit_line(project_id: str, order: int, line_id: str, payload: dict):
     """使用者自己改一句：讀音標記版台詞、字幕、語氣。改完重跑這一句的關卡、寫回分鏡表。"""
+    if jobs.is_running(project_id, order):
+        # 台詞導演跑完會整份寫回，跑的途中改的會被蓋掉 → 先擋下來、講清楚
+        raise HTTPException(409, "the line director is still running — edit after it finishes")
+    with _edit_lock:   # 這裡是讀整份 → 改一句 → 整份寫回；兩個請求交錯會互相蓋掉，所以一次一個
+        return _edit_line(project_id, order, line_id, payload)
+
+
+_edit_lock = threading.Lock()
+
+
+def _edit_line(project_id: str, order: int, line_id: str, payload: dict):
     state, seg = _segment(project_id, order)
     film = state.film_language
     learners = [x for x in state.learner_languages if x != film]
@@ -140,11 +167,30 @@ def edit_line(project_id: str, order: int, line_id: str, payload: dict):
     return new
 
 
+def _burn_state(project_id: str, order: int, lang: str, v: dict) -> dict:
+    """燒字幕的狀態：存檔寫著 running、執行緒卻不在（燒到一半 app 被關掉）＝中斷，按鈕要再出來。"""
+    alive = (project_id, order, lang) in _burning and _burning[(project_id, order, lang)].is_alive()
+    if not alive and v.get("status") == "running":
+        v = {**v, "status": "interrupted"}
+    return {**v, "running": alive}
+
+
+def _video_cues(seg, film: str) -> list[dict]:
+    """這一段現在的成片對應的字幕時間：成片流程做出來的（剪過頭、只含收進去的鏡）用它當時算好的那份；
+    一般接片（每一條有檔案的鏡、不剪頭）才照鏡頭長度排。兩種片長不一樣，用錯字幕會整條提早。"""
+    if seg.finish_cues and seg.output_uri and seg.output_uri == seg.finish_outputs.get("master"):
+        return seg.finish_cues
+    return study_subs.cues(seg, film)
+
+
 @router.post("/{project_id}/segments/{order}/study-video")
 def start_study_video(project_id: str, order: int, lang: str):
     state, seg = _segment(project_id, order)
     if not seg.lines:
         raise HTTPException(409, "direct the lines first")
+    if lang == state.film_language or lang not in state.learner_languages:
+        raise HTTPException(400, f"subtitle language must be one of the learner languages {state.learner_languages}, "
+                                 f"not the film language ({state.film_language})")
     if not seg.output_uri:
         raise HTTPException(409, "this part has no assembled video yet — generate and assemble the shots first")
     key = (project_id, order, lang)
@@ -162,10 +208,15 @@ def start_study_video(project_id: str, order: int, lang: str):
             src = media_store.path_for(sg.output_uri)
             if not src or not src.exists():
                 raise study_subs.StudySubError("找不到這一段的成片檔")
-            items = study_subs.cues(sg, st.film_language)
-            out = src.with_name(f"{src.stem}_study_{st.film_language}-{lang}.mp4")
-            study_subs.burn(src, items, st.film_language, lang, out)
-            uri = media_store.save(project_id, out.name, out.read_bytes(), "video/mp4")
+            items = _video_cues(sg, st.film_language)
+            # 先燒在暫存資料夾、存進媒體庫後就刪：直接寫在媒體庫旁邊會多留一份一樣大的檔
+            work = Path(tempfile.mkdtemp(prefix="gl_study_"))
+            try:
+                out = work / f"{src.stem}_study_{st.film_language}-{lang}.mp4"
+                study_subs.burn(src, items, st.film_language, lang, out)
+                uri = media_store.save(project_id, out.stem, out.read_bytes(), "video/mp4")
+            finally:
+                shutil.rmtree(work, ignore_errors=True)
             mark(status="done", uri=uri, cues=len(items))
         except demo_mode.DemoBlocked:
             # 專案規矩（接線檢查會查）：籠統 except 之前一律先放行 DemoBlocked
@@ -197,7 +248,7 @@ def study_srt(project_id: str, order: int, lang: str):
     state, seg = _segment(project_id, order)
     if not seg.lines:
         raise HTTPException(409, "direct the lines first")
-    items = study_subs.cues(seg, state.film_language)
+    items = _video_cues(seg, state.film_language)
     if not items:   # 還沒生影片：照分鏡表的秒數排，先給人看字幕長怎樣
         t = 0.0
         for ln in seg.lines:

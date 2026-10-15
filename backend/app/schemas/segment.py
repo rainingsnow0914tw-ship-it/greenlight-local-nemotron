@@ -374,6 +374,9 @@ class Segment(BaseModel):
     finish_status: str | None = Field(default=None, description="成片流程狀態：running／done／failed。")
     finish_outputs: dict[str, str] = Field(
         default_factory=dict, description="成片流程的產出：master（沒字幕）、各字幕版（ja-zh…）→ 媒體庫 uri。")
+    finish_cues: list[dict] = Field(
+        default_factory=list,
+        description="成片時算好的學習字幕時間（扣過剪頭、只含收進成片的鏡）。之後對成片燒字幕／下載字幕檔都用這份。")
     study_videos: dict[str, dict] = Field(
         default_factory=dict,
         description="學習字幕版成片，key＝字幕語言（ja-zh 的 zh）：{status, uri, error}。重新接片或重導台詞時清空。")
@@ -431,6 +434,13 @@ class Segment(BaseModel):
     )
 
     spent_usd: float = 0.0
+
+    def clear_line_direction(self) -> None:
+        """分鏡表換掉了：台詞導演的結果全部作廢（唯一的家，換分鏡表的每個地方都呼叫這個）。
+        鏡號是固定格式（s001_03），不清的話新分鏡同一個鏡號會配到舊分鏡那一句的台詞與字幕。"""
+        self.lines, self.study_notes = [], []
+        self.lines_status, self.lines_log = None, []
+        self.study_videos, self.finish_cues = {}, []
 
     @property
     def status(self) -> SegmentStatus:

@@ -24,6 +24,7 @@
  */
 
 import { Icon } from './Icons'
+import { sysText } from '../sysText'
 import { VerifyBlock } from './VerifyBlock'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -333,7 +334,7 @@ export function ProductionPanel({
         <p className="prompts-note">{copy.batchWhy}</p>
 
         {/* 試拍沒過就講清楚為什麼不能開始，不要只給一個灰掉的按鈕 */}
-        {!batch.can_start && <div className="notice warn">{batch.blocked_reason}</div>}
+        {!batch.can_start && <div className="notice warn">{sysText(batch.blocked_reason, lang)}</div>}
 
         {batch.can_start && batch.next_shot && (
           <div className="prod-actions">

@@ -38,7 +38,9 @@ def start_finish(project_id: str, order: int):
 @router.get("/{project_id}/segments/{order}/finish")
 def finish_state(project_id: str, order: int, since: int = 0):
     state, seg = _segment(project_id, order)
-    return {"status": "running" if finish.is_running(project_id, order) else seg.finish_status,
+    # 存檔寫著 running、執行緒卻不在（跑到一半 app 被關掉）＝中斷，畫面要再給「開始」鈕
+    running = finish.is_running(project_id, order)
+    return {"status": "running" if running else ("interrupted" if seg.finish_status == "running" else seg.finish_status),
             "log": seg.finish_log[since:], "total": len(seg.finish_log), "outputs": list(seg.finish_outputs),
             "shots_ready": sum(1 for c in seg.clips if c.uri)}
 

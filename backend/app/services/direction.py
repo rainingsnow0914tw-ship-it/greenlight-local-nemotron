@@ -120,6 +120,7 @@ def _run(project_id: str, order: int) -> None:
             from ..schemas.project import Stage
 
             sg = next(s for s in st.segments if s.order == order)
+            sg.clear_line_direction()   # 新分鏡：舊的台詞導演結果作廢（鏡號會重複）
             sg.shot_list = ShotList(screenplay_title=st.screenplay.title, shots=all_shots,
                                     aspect_ratio=st.aspect_ratio or "16:9",
                                     prompt_language=st.prompt_language or "zh", film_language=st.film_language or "zh",

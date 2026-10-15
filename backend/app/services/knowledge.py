@@ -76,12 +76,40 @@ def load_yaml(name: str) -> dict:
         data = yaml.safe_load(p.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             raise ValueError("top level must be a mapping")
+        if name in VALIDATORS:
+            VALIDATORS[name](data)        # 格式對但內容缺欄位，一樣退回預設（不然要等生完一鏡才炸）
         _last_error.pop(name, None)
         return data
     except Exception as exc:  # noqa: BLE001 - 使用者改壞了：退回預設，但要講出來
         _last_error[name] = f"{type(exc).__name__}: {str(exc)[:300]}"
         logger.warning("knowledge %s is broken (%s) — using the bundled default", p, exc)
         return yaml.safe_load(default_path(name).read_text(encoding="utf-8"))
+
+
+def _check_symptoms(data: dict) -> None:
+    """症狀庫的必要欄位（doctor.py 會用到的每一個）；缺了就講出是哪一條、缺什麼。"""
+    items = data.get("symptoms")
+    if not isinstance(items, list) or not items:
+        raise ValueError("'symptoms' must be a non-empty list")
+    for i, s in enumerate(items):
+        where = f"symptoms[{i}] ({s.get('id', '?') if isinstance(s, dict) else '?'})"
+        if not isinstance(s, dict) or not s.get("id"):
+            raise ValueError(f"{where}: needs an id")
+        t = s.get("title")
+        if not isinstance(t, dict) or not t.get("zh") or not t.get("en"):
+            raise ValueError(f"{where}: title needs zh and en")
+        if not isinstance(s.get("detect"), dict):
+            raise ValueError(f"{where}: detect must be a mapping")
+        causes = s.get("causes")
+        if not isinstance(causes, list) or not causes:
+            raise ValueError(f"{where}: causes must be a non-empty list")
+        for j, c in enumerate(causes):
+            f = c.get("fix") if isinstance(c, dict) else None
+            if not isinstance(c, dict) or not c.get("cause") or not isinstance(f, dict) or not f.get("action") or not f.get("zh"):
+                raise ValueError(f"{where} causes[{j}]: needs cause, and fix with action and zh")
+
+
+VALIDATORS = {"symptoms.yaml": _check_symptoms}
 
 
 def status() -> dict:

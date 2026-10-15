@@ -564,7 +564,7 @@ export default function App() {
                             stopPropagation：卡片本身是「進入專案」的按鈕。 */}
                         <button
                           className="btn ghost small"
-                          title="用同一份劇本開一個全新的版本，進度歸零，這個專案不受影響"
+                          title={{ zh: "用同一份劇本開一個全新的版本，進度歸零，這個專案不受影響", en: "Start a fresh version from the same script; this project stays as it is", ja: "同じ台本から新しいバージョンを始めます（このプロジェクトはそのまま）" }[lang]}
                           onClick={async (e) => {
                             e.stopPropagation()
                             setBusy(true)
@@ -589,7 +589,7 @@ export default function App() {
                             東西保留 —— 那是跨專案累積的記憶，不隨專案刪除。 */}
                         <button
                           className="btn ghost small"
-                          title="刪掉這個專案與它所有的圖檔影片檔"
+                          title={{ zh: "刪掉這個專案與它所有的圖檔影片檔", en: "Delete this project and all of its images and videos", ja: "このプロジェクトと、その画像・動画をすべて削除します" }[lang]}
                           onClick={async (e) => {
                             e.stopPropagation()
                             setError(null)

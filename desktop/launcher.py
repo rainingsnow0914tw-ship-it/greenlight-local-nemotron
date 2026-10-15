@@ -30,6 +30,42 @@ def _root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _attach_log() -> None:
+    """沒有主控台的 EXE（雙擊開的）stdout／stderr 是 None：uvicorn 一設定 log 就去問 isatty() → 整個 app 開不起來。
+    沒有就接到記錄檔（資料夾裡的 logs/app.log），之後出錯也有東西可以查。"""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    home = os.getenv("GREENLIGHT_HOME") or os.path.join(os.getenv("LOCALAPPDATA") or os.path.expanduser("~"),
+                                                        "GreenlightLocal")
+    try:
+        os.makedirs(os.path.join(home, "logs"), exist_ok=True)
+        log = open(os.path.join(home, "logs", "app.log"), "a", encoding="utf-8", buffering=1)
+    except OSError:
+        log = open(os.devnull, "w", encoding="utf-8")
+    if sys.stdout is None:
+        sys.stdout = log
+    if sys.stderr is None:
+        sys.stderr = log
+
+
+def _quiet_subprocesses() -> None:
+    """沒有主控台的 EXE 叫 ffmpeg 這類主控台程式：Windows 會替每一次另開一個黑色視窗（畫面一直閃），
+    而且子程式的輸入沒交代時偶爾會被干擾、還沒讀檔就結束（ffmpeg 輸出整個空白 → 成片失敗）。
+    一個地方統一設定，所有呼叫點（含第三方套件）都套到：不開視窗、輸入接空的。"""
+    if os.name != "nt" or not getattr(sys, "frozen", False):
+        return
+    import subprocess
+
+    original = subprocess.Popen.__init__
+
+    def init(self, *args, **kwargs):
+        kwargs.setdefault("stdin", subprocess.DEVNULL)
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+        original(self, *args, **kwargs)
+
+    subprocess.Popen.__init__ = init
+
+
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -64,6 +100,8 @@ def _wait_up(url: str, seconds: float = 60) -> bool:
 
 
 def main() -> int:
+    _attach_log()
+    _quiet_subprocesses()
     port = _free_port()
     url = f"http://127.0.0.1:{port}"
     server = _start_server(port)

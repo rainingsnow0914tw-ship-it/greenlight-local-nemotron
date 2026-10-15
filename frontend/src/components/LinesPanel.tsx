@@ -8,7 +8,7 @@
  * 使用者可以自己改任何一句（改完重跑關卡、寫回分鏡表，H3 唸的就是改過的）。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { Lang } from '../api'
+import { send, type Lang } from '../api'
 import { LANG_NAME } from './LanguagePanel'
 
 type Line = {
@@ -107,6 +107,7 @@ function Ruby({ text }: { text: string }) {
 export function LinesPanel({ lang, projectId, order }: { lang: Lang; projectId: string; order: number }) {
   const t = T[lang]
   const [st, setSt] = useState<State | null>(null)
+  const [err, setErr] = useState('')
   const [now, setNow] = useState(Date.now())
   const [pick, setPick] = useState(0)
   const [subLang, setSubLang] = useState<string>('')
@@ -130,23 +131,29 @@ export function LinesPanel({ lang, projectId, order }: { lang: Lang; projectId: 
   if (!st || !st.study_mode) return null
   const film = LANG_NAME[lang][st.film_language] ?? st.film_language
   const nm = (c: string) => LANG_NAME[lang][c] ?? c
-  const start = async () => {
-    await fetch(`/api/projects/${projectId}/segments/${order}/lines`, { method: 'POST' })
+  // 伺服器回錯誤要顯示出來（不默默吞掉）；busy 一定要在 finally 放掉，不然輪詢會永遠停住
+  const act = async (fn: () => Promise<void>) => {
+    setErr('')
+    try {
+      await fn()
+    } catch (e) {
+      setErr((e as Error).message)
+    }
     void poll()
   }
-  const saveEdit = async (id: string) => {
+  const start = () => act(() => send(`/api/projects/${projectId}/segments/${order}/lines`, { method: 'POST' }))
+  const saveEdit = (id: string) => act(async () => {
     busy.current = true
-    await fetch(`/api/projects/${projectId}/segments/${order}/lines/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft),
-    })
-    busy.current = false
-    setEditing(null)
-    void poll()
-  }
-  const burn = async (l: string) => {
-    await fetch(`/api/projects/${projectId}/segments/${order}/study-video?lang=${l}`, { method: 'POST' })
-    void poll()
-  }
+    try {
+      await send(`/api/projects/${projectId}/segments/${order}/lines/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft),
+      })
+      setEditing(null)
+    } finally {
+      busy.current = false
+    }
+  })
+  const burn = (l: string) => act(() => send(`/api/projects/${projectId}/segments/${order}/study-video?lang=${l}`, { method: 'POST' }))
 
   const log = st.log
   const last = log[log.length - 1]
@@ -165,9 +172,10 @@ export function LinesPanel({ lang, projectId, order }: { lang: Lang; projectId: 
     <section className="section">
       <div className="section-head">
         <h2>{t.title}</h2>
-        {st.status && <span className={`badge ${st.status === 'done' ? 'done' : st.status === 'failed' ? 'over' : 'in-progress'}`}>
-          {st.status === 'done' ? t.done : st.status === 'failed' ? t.failed : t.running}</span>}
+        {st.status && <span className={`badge ${st.status === 'done' ? 'done' : (st.status === 'failed' || st.status === 'interrupted') ? 'over' : 'in-progress'}`}>
+          {st.status === 'done' ? t.done : (st.status === 'failed' || st.status === 'interrupted') ? t.failed : t.running}</span>}
       </div>
+      {err && <div className="notice warn">{err}</div>}
 
       {!st.has_shot_list ? <div className="notice">{t.needShots}</div> : <p className="lang-lead">{t.lead(st.shots_with_dialogue, film)}</p>}
 
