@@ -1,7 +1,7 @@
 """組評審示範影片：九列，每列＝畫面（app 實錄／我們生的片）＋旁白，照 旁白/時間表.md 的時間接。
 
 沿用 nebius-director/video/build_demo.py 的做法（寫成腳本，素材換了重跑就好，不手剪）。
-素材只讀：app 實錄在 錄影/（record_app.py 錄的）、生好的片在測試專案 %TEMP%\\gl_lang。
+素材只讀：app 實錄在 錄影/（record_app.py 錄的）、生好的片在測試專案 greenlight-local/_private/示範專案（不進 git）。
 錄影的起點從片尾倒推（片長 − 動作秒數）：Playwright 錄影開頭會掉幀，記下的起點不準（第 4 列差 2.6 秒）。
 
 輸出：成片/greenlight_local_demo.mp4（1920x1080、30fps）
@@ -19,7 +19,7 @@ APP = HERE.parents[1]          # greenlight-local/（這支在 submission/demo-v
 WS = HERE.parents[2]           # 工作區根目錄（ComfyUI 在這裡，只讀）
 REC = HERE / "錄影"
 NARR = HERE / "旁白" / "narration_full.wav"
-GL = pathlib.Path(os.environ["TEMP"]) / "gl_lang"
+GL = APP / "_private" / "示範專案"     # 測試專案（第 61 場），私人資料夾、不進 git
 OUT = HERE / "成片"
 WORK = OUT / "_work"
 WORK.mkdir(parents=True, exist_ok=True)

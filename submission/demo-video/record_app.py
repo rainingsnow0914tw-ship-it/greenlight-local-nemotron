@@ -5,7 +5,7 @@
   導航（切英文、點進專案）錄在每支的開頭，ready.json 記下「從第幾秒開始是要用的畫面」，剪接時從那裡切。
 - 只看不改：診斷修法只把滑鼠停在「Apply」上，不按（按了會改到測試專案的資料）。
 
-先開 EXE：GREENLIGHT_HOME=%TEMP%\\gl_lang GreenlightLocal.exe --server --url-file %TEMP%\\gl_url.txt
+先開 EXE：GREENLIGHT_HOME=greenlight-local\\_private\\示範專案 GreenlightLocal.exe --server --url-file %TEMP%\\gl_url.txt
 用法：.venv-rec/Scripts/python record_app.py [列號 ...]   （不給就六列全錄）
 輸出：錄影/<列號>.webm＋錄影/ready.json
 """

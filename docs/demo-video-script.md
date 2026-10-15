@@ -7,7 +7,7 @@ narrator, one voice reference shared by every segment so it stays the same perso
 used. The picture is screen recordings of the real app plus clips we rendered with it.
 
 Test scene: chapter 10, scene 61 of our series (Tsukine and Lisa arguing in the office restroom), in the
-test project `%TEMP%\gl_lang`.
+test project (kept outside the repository).
 
 | Time | On screen | Narration |
 |---|---|---|
@@ -24,7 +24,7 @@ test project `%TEMP%\gl_lang`.
 ## Recording notes
 
 - Record the app at 1280×800 or larger; the clip cards and options read best at that width.
-- Shot 6 (study subtitles): `%TEMP%\gl_lang\shots\s001_06_ja-zh.mp4`. Mouth closed vs moving:
+- Shot 6 (study subtitles): `shots/s001_06_ja-zh.mp4` in the test project. Mouth closed vs moving:
   `s001_06_v1_rep1.mp4` and `s001_06.mp4` in the same folder.
 - Shot 3's check and diagnosis are on the segment page of the test project (preview `greenlight-local-lang`).
 - The panels already hold the logs from real runs, so nothing needs to be re-run on camera.
