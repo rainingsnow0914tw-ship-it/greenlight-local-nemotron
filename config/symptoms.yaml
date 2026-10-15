@@ -20,20 +20,24 @@ symptoms:
   causes:
     - cause: 台詞那一行沒寫「誰用什麼聲音說」—— 模型不知道是誰在講，就不把聲音放到畫面裡的人嘴上
       cause_en: "The dialogue line doesn't say who speaks in which voice, so the model never puts the voice on the mouth of the person on screen"
-      fix: {action: edit_voice_role, zh: 這一鏡是角色講話就標成角色（程式會寫「<名字>用<聲音>說日語台詞︰」）；本來就是心聲就保留、不算缺陷, en: "If the character is meant to speak, mark the shot as the character's line (the program writes '<name> says in <voice>: …'); if it is an inner voice, keep it — that is not a defect"}
+      cause_ja: "セリフの行に「誰がどの声で話すか」が書かれていないため、モデルは画面の人物の口に声を乗せない"
+      fix: {action: edit_voice_role, zh: 這一鏡是角色講話就標成角色（程式會寫「<名字>用<聲音>說日語台詞︰」）；本來就是心聲就保留、不算缺陷, en: "If the character is meant to speak, mark the shot as the character's line (the program writes '<name> says in <voice>: …'); if it is an inner voice, keep it — that is not a defect", ja: "キャラクターが話すカットならキャラクターのセリフとして指定する（プログラムが「<名前>が<声>で話す」と書く）。心の声ならそのままでよく、不具合ではない"}
       example:
         before: "日語台詞︰「つきね、あなたのためよ。AI依存はほんとにある問題よ、ニュース見た？」"
         after: "Lisa用a woman in her late twenties, clear confident voice, steady moderate pacing的聲音說日語台詞︰「つきね、あなたのためよ。…」"
       source: Greenlight Local 2026-10-15 s001_06 —— 沒主詞 3/3 嘴閉、有主詞 1/1 對嘴；作者規則 08_招式 v1.6 旁白鏡段、症狀表 v1.46 C 段
       source_en: "Greenlight Local 2026-10-15 s001_06: no speaker named 3/3 mouth closed, speaker named 1/1 lip-synced"
+      source_ja: "Greenlight Local s001_06：話者なし 3/3 口が閉じたまま、話者あり 1/1 口が合う"
     - cause: 角色低頭打手機、台詞又像一則訊息 —— 模型當成「打出來的字」配旁白
       cause_en: "The character is looking down typing on a phone and the line reads like a message, so the model treats it as typed text read over the picture"
-      fix: {action: edit_performance, zh: 講話的鏡不要讓角色低頭打手機；改成對著人或螢幕講（收手 → 舉到胸前 → 往前傾）, en: "Don't have the character typing in a speaking shot; have them speak to a person or a screen (hands back, raised to the chest, leaning forward)"}
+      cause_ja: "キャラクターがうつむいてスマホを打っていて、セリフがメッセージのように読めるため、モデルが打った文字の読み上げとして扱う"
+      fix: {action: edit_performance, zh: 講話的鏡不要讓角色低頭打手機；改成對著人或螢幕講（收手 → 舉到胸前 → 往前傾）, en: "Don't have the character typing in a speaking shot; have them speak to a person or a screen (hands back, raised to the chest, leaning forward)", ja: "話すカットでスマホを打たせない。人や画面に向かって話させる（手を戻す → 胸の前に上げる → 前のめりになる）"}
       example:
         before: "表演：她低頭在手機上打字。"
         after: "表演：她把手從筆電上收回來，兩手握拳舉到胸前，往前傾。"
       source: 作者動畫第七章 s029_01（症狀表 C 段，對照組 ch06 s022_04 同首幀同參考圖就有對嘴）
       source_en: "Author anime chapter 7 s029_01 (control: ch06 s022_04, same first frame and references, lip-synced)"
+      source_ja: "作者のアニメ第7章 s029_01（対照：第6章 s022_04、同じ最初のフレームと参照画像で口が合った）"
 
 - id: S02
   title: {zh: 開頭有亂語, en: Gibberish before the line starts, ja: 冒頭に意味不明な声}
@@ -42,9 +46,11 @@ symptoms:
   causes:
     - cause: H3 開口前會冒一段不成字的聲音；聽寫會把它當雜音丟掉，所以「聽到的字」照樣對得上（假綠燈），要量音量才抓得到
       cause_en: "H3 sometimes makes wordless sound before the line. Speech recognition drops it as noise, so the transcript still matches (a false pass); only measuring loudness catches it"
-      fix: {action: trim_head, zh: 成片時從第一個字前 0.1 秒剪掉開頭，不用重生, en: "When finishing, cut the head 0.1 s before the first word. No re-render"}
+      cause_ja: "H3 はセリフの前に言葉にならない音を出すことがある。音声認識はそれを雑音として捨てるので文字起こしは一致してしまう（見かけ上の合格）。音量を測らないと見つからない"
+      fix: {action: trim_head, zh: 成片時從第一個字前 0.1 秒剪掉開頭，不用重生, en: "When finishing, cut the head 0.1 s before the first word. No re-render", ja: "仕上げで最初の語の 0.1 秒前から頭を切る。再生成は不要"}
       source: 作者幕後短片第23集 s09（headnoise.py，10-14）；真亂語約 -2dB，氣音種子約 -13dB 不算
       source_en: "Author behind-the-scenes ep. 23 s09 (headnoise.py, 10-14): real gibberish ≈ -2 dB, breath ≈ -13 dB is fine"
+      source_ja: "作者の舞台裏ショート第23話 s09（headnoise.py）：本物の意味不明な声は約 -2 dB、息は約 -13 dB で問題なし"
 
 - id: S03
   title: {zh: 開頭第一個字拖很長（可能只是名字）, en: The first word drags (may just be a name), ja: 最初の語が長い（名前かも）}
@@ -53,9 +59,11 @@ symptoms:
   causes:
     - cause: 聽寫不認得的名字（つきね→好きね）也會讓第一個字拖長；機器聽寫抓名字不可信
       cause_en: "A name the recognizer doesn't know (つきね heard as 好きね) also makes the first word look long; machine transcripts are unreliable for names"
-      fix: {action: human, zh: 請人聽開頭一秒；名字唸對就收，不要因為聽寫改寫法重生, en: "Have a person listen to the first second; if the name is said right, keep it. Don't re-render because of the transcript"}
+      cause_ja: "認識できない名前（つきね → 好きね）でも最初の語が長く見える。機械の文字起こしは名前について当てにならない"
+      fix: {action: human, zh: 請人聽開頭一秒；名字唸對就收，不要因為聽寫改寫法重生, en: "Have a person listen to the first second; if the name is said right, keep it. Don't re-render because of the transcript", ja: "最初の 1 秒を人が聞く。名前が正しく読めていればそのままでよい。文字起こしを理由に再生成しない"}
       source: Greenlight Local s001_06，人聽過名字唸對了；機器聽寫的名字不算證據
       source_en: "Greenlight Local 2026-10-15 s001_06: a person confirmed the name was said right; transcripts are not evidence for names"
+      source_ja: "Greenlight Local s001_06：名前が正しく読めていることを人が確認。名前については文字起こしは根拠にならない"
 
 - id: S04
   title: {zh: 台詞唸錯、唸糊或少一段, en: The line is wrong, slurred or partly missing, ja: セリフの言い間違い・不明瞭・欠落}
@@ -64,15 +72,19 @@ symptoms:
   causes:
     - cause: 生成本身的隨機性（同一份提示詞、隔壁鏡都過）
       cause_en: "Plain randomness in generation (the same prompt style passes in the neighbouring shots)"
-      fix: {action: reroll, zh: 同一份提示詞換種子再生一次（不要先改提示詞：加唸法指示會一起被唸出來）, en: "Render again with the same prompt and a new seed (don't add pronunciation instructions — they get spoken too)"}
+      cause_ja: "生成そのもののランダムさ（同じ書き方のプロンプトが隣のカットでは通っている）"
+      fix: {action: reroll, zh: 同一份提示詞換種子再生一次（不要先改提示詞：加唸法指示會一起被唸出來）, en: "Render again with the same prompt and a new seed (don't add pronunciation instructions — they get spoken too)", ja: "同じプロンプトでシードを変えてもう一度生成する（読み方の指示を足さない —— 指示まで読み上げられる）"}
       source: 作者規則 00_症狀表 C 段（唸法指示疊加反而更糟）、reroll_audio.py
       source_en: "Author symptom table section C (stacking pronunciation hints made it worse); reroll_audio.py"
+      source_ja: "作者の症状表 C 節（読み方の指示を重ねると悪化した）；reroll_audio.py"
     - cause: 繞口的台詞（中文同音字連發、j／q／x 短音連著；日文書面語太長）
       cause_en: "A tongue-twister line (runs of similar Chinese sounds, or long written-style Japanese)"
-      fix: {action: edit_line, zh: 改成口語、拆短；換種子重生碰運氣沒用, en: "Rewrite it as spoken language and split it up; re-rolling the seed won't help"}
+      cause_ja: "早口言葉のようなセリフ（中国語の似た音の連続、長い書き言葉の日本語）"
+      fix: {action: edit_line, zh: 改成口語、拆短；換種子重生碰運氣沒用, en: "Rewrite it as spoken language and split it up; re-rolling the seed won't help", ja: "話し言葉に直して短く分ける。シードを変えて運に任せても直らない"}
       example: {before: "說幾句日文", after: "講兩句日文"}
       source: 作者 tongue.py（幕後短片 202 句校準，3 句唸錯全抓到、0 誤報）；第三世 kougo.py
       source_en: "Author tongue.py (calibrated on 202 lines: caught all 3 misreads, 0 false alarms)"
+      source_ja: "作者の tongue.py（202 行で調整：読み間違い 3 行をすべて検出、誤検出 0）"
 
 - id: S05
   title: {zh: 聽不到任何台詞, en: No speech at all, ja: セリフが聞こえない}
@@ -81,10 +93,12 @@ symptoms:
   causes:
     - cause: 台詞太短（3 字以下）模型抓不到，整句變亂音或乾脆不講
       cause_en: "The line is too short (3 characters or fewer); the model misses it and makes noise or says nothing"
-      fix: {action: edit_line, zh: 台詞至少六個字（中文實證）；日文 4～5 字第三世收過、3 字以下要小心, en: "Make the line at least six characters (proven for Chinese); 4–5 characters has worked in Japanese, 3 or fewer is risky"}
+      cause_ja: "セリフが短すぎる（3 文字以下）とモデルが拾えず、雑音になるか何も言わない"
+      fix: {action: edit_line, zh: 台詞至少六個字（中文實證）；日文 4～5 字第三世收過、3 字以下要小心, en: "Make the line at least six characters (proven for Chinese); 4–5 characters has worked in Japanese, 3 or fewer is risky", ja: "セリフを 6 文字以上にする（中国語で実証）。日本語は 4〜5 文字なら通った実績あり、3 文字以下は危険"}
       example: {before: "何？", after: "え、何の話してるの？"}
       source: 作者動畫第四章（≤3 字三鏡全中、零誤報）；第三世 286 句誤報掃描（10-15）
       source_en: "Author anime chapter 4 (all three ≤3-character lines failed, no false alarms); 286-line false-alarm scan, 10-15"
+      source_ja: "作者のアニメ第4章（3 文字以下の 3 カットがすべて失敗、誤検出なし）；286 行の誤検出チェック"
 
 - id: S06
   title: {zh: 講完到結尾不到 0.5 秒（像被切掉）, en: Less than 0.5 s after the line ends (sounds cut off), ja: 言い終わりから 0.5 秒未満}
@@ -93,9 +107,11 @@ symptoms:
   causes:
     - cause: 鏡頭秒數只夠唸完台詞，沒留收尾；接下一鏡時聽起來像被硬切
       cause_en: "The shot is only just long enough for the line, with no room after it; cut to the next shot it sounds chopped"
-      fix: {action: lengthen_shot, zh: 這一鏡加 0.5～1 秒，或把台詞改短, en: "Add 0.5–1 s to the shot, or shorten the line"}
+      cause_ja: "カットの長さがセリフぎりぎりで、言い終わった後の余白がない。次のカットにつなぐと切られたように聞こえる"
+      fix: {action: lengthen_shot, zh: 這一鏡加 0.5～1 秒，或把台詞改短, en: "Add 0.5–1 s to the shot, or shorten the line", ja: "カットを 0.5〜1 秒長くするか、セリフを短くする"}
       source: 作者 midcheck.py（講完後預留 0.5～0.8 秒）
       source_en: "Author midcheck.py (leave 0.5–0.8 s after a line, set 09-12)"
+      source_ja: "作者の midcheck.py（言い終わった後に 0.5〜0.8 秒残す）"
 
 - id: S07
   title: {zh: 開口太晚, en: Starts speaking too late, ja: 話し始めが遅い}
@@ -104,9 +120,11 @@ symptoms:
   causes:
     - cause: 表演句在開口前排了太多動作，模型照順序演完才講
       cause_en: "The performance puts too many actions before the line, and the model acts them all out in order before speaking"
-      fix: {action: edit_performance, zh: 開口前的動作縮成一個，其他動作放到講話中或講完後, en: "Keep one action before the line; move the rest to during or after it"}
+      cause_ja: "演技の指示でセリフの前に動作を詰め込みすぎ、モデルが順番どおり全部演じてから話し始める"
+      fix: {action: edit_performance, zh: 開口前的動作縮成一個，其他動作放到講話中或講完後, en: "Keep one action before the line; move the rest to during or after it", ja: "セリフの前の動作は 1 つにし、残りはセリフ中か後ろに回す"}
       source: 作者導演迴圈規則 4、8（台詞要在秒數內講完）
       source_en: "Director-loop rules 4 and 8 (a line must fit its shot)"
+      source_ja: "監督ループのルール 4 と 8（セリフはカットの長さに収める）"
 
 - id: S08
   title: {zh: 動作演完又重演一次, en: The action is acted out twice, ja: 動作が二回繰り返される}
@@ -115,12 +133,14 @@ symptoms:
   causes:
     - cause: 模型會填滿你留給它的每一秒：動作 3 秒演完、鏡長 8 秒，剩下的時間它就再演一次
       cause_en: "The model fills every second you give it: a 3-second action in an 8-second shot gets acted out again"
-      fix: {action: edit_performance, zh: 表演句的動作要排滿整鏡（三個以上、有先後），或把鏡頭縮短, en: "Fill the whole shot with actions (three or more, in order), or shorten the shot"}
+      cause_ja: "モデルは与えられた秒数をすべて埋める：3 秒の動作に 8 秒のカットだと、残りの時間でもう一度演じる"
+      fix: {action: edit_performance, zh: 表演句的動作要排滿整鏡（三個以上、有先後），或把鏡頭縮短, en: "Fill the whole shot with actions (three or more, in order), or shorten the shot", ja: "カット全体を動作で埋める（3 つ以上、順番つき）か、カットを短くする"}
       example:
         before: "表演：她把湯碗放進微波爐。（鏡長 8 秒）"
         after: "表演：她把湯碗放進微波爐、關上門、按下按鍵，然後靠在流理台邊等，手指輕敲檯面。"
       source: 作者動畫 s008_02b（看片抓到）
       source_en: "Author anime shot s008_02b (caught on review; director notes)"
+      source_ja: "作者のアニメ s008_02b（試写で発見）"
 
 - id: S09
   title: {zh: 整句唸成別的語言（意思是對的）, en: The whole line comes out in another language (meaning correct), ja: 別の言語で話している（意味は正しい）}
@@ -129,6 +149,8 @@ symptoms:
   causes:
     - cause: 台詞行沒明講語言 —— 漢字台詞模型不知道該用哪個語言唸
       cause_en: "The dialogue line doesn't name its language, so with kanji text the model can't tell which language to speak"
-      fix: {action: edit_voice_role, zh: 台詞行一定要寫語言（日語台詞／普通話口白），程式已自動寫；若是手改提示詞漏掉就補回, en: "The dialogue line must name the language (the program writes it); if a hand-edited prompt dropped it, add it back"}
+      cause_ja: "セリフの行に言語が書かれていないため、漢字のセリフをどの言語で読むかモデルが判断できない"
+      fix: {action: edit_voice_role, zh: 台詞行一定要寫語言（日語台詞／普通話口白），程式已自動寫；若是手改提示詞漏掉就補回, en: "The dialogue line must name the language (the program writes it); if a hand-edited prompt dropped it, add it back", ja: "セリフの行には必ず言語を書く（プログラムが自動で書く）。手で直したプロンプトで消えていたら戻す"}
       source: 作者規則 08_招式 法則二十、症狀表 C 段
       source_en: "Author rules, prompt techniques rule 20; symptom table section C"
+      source_ja: "作者のルール：プロンプトの書き方 第20則、症状表 C 節"

@@ -31,25 +31,29 @@ def candidates(verify: dict, marks: list[str]) -> list[dict]:
     out = []
     for s in config_loader.symptoms():
         d = s.get("detect") or {}
-        ev, ev_en = [], []      # ev 給模型看、拿來比對引用；ev_en 是同一條證據的英文版（畫面切英文時顯示）
+        # ev 給模型看、拿來比對引用；ev_en／ev_ja 是同一條證據的英文版、日文版（畫面照介面語言顯示）
+        ev, ev_en, ev_ja = [], [], []
         c = failed.get(d.get("check"))
         if c and c["level"] in (d.get("level") or []):
             ev.append(f"check:{c['id']}={c['value']}（{c['zh']}）")
             ev_en.append(f"check:{c['id']}={c['value']} ({c.get('en') or c['zh']})")
+            ev_ja.append(f"check:{c['id']}={c['value']}（{c.get('ja') or c.get('en') or c['zh']}）")
         if d.get("human") and d["human"] in marks:
             ev.append(f"human:{d['human']}")
             ev_en.append(f"human:{HUMAN_EN.get(d['human'], d['human'])}")
+            ev_ja.append(f"human:{HUMAN_JA.get(d['human'], d['human'])}")
         if ev:
-            out.append({**s, "evidence": ev, "evidence_en": ev_en})
+            out.append({**s, "evidence": ev, "evidence_en": ev_en, "evidence_ja": ev_ja})
     return out
 
 
 HUMAN_EN = {"嘴沒動": "mouth still", "嘴有動": "mouth moves", "動作重複": "action repeats", "語言不對": "wrong language"}
+HUMAN_JA = {"嘴沒動": "口が動かない", "嘴有動": "口が動く", "動作重複": "動作の繰り返し", "語言不對": "言語が違う"}
 
 
-def _tr(zh: str, en: str) -> dict:
-    """畫面上要顯示的字一律帶兩種語言（看英文的人和看中文的人都看得懂）；日文畫面沒有就退回英文（VerifyBlock 的 L()）。"""
-    return {"zh": zh, "en": en or zh}
+def _tr(zh: str, en: str, ja: str = "") -> dict:
+    """畫面上要顯示的字一律帶三種語言（英文、中文、日文介面各自看得懂）；缺日文才退回英文。"""
+    return {"zh": zh, "en": en or zh, "ja": ja or en or zh}
 
 
 class _Pick(BaseModel):
@@ -59,9 +63,11 @@ class _Pick(BaseModel):
                                             "or from the control shots (e.g. 'check:head=1.2' or 'shot:s001_03')")
     reasoning: str = Field(description="2-3 sentences in Traditional Chinese: why this cause and not the wrong guess")
     reasoning_en: str = Field(default="", description="the same reasoning in English")
+    reasoning_ja: str = Field(default="", description="the same reasoning in natural Japanese")
     fix_detail: str = Field(description="the concrete change for THIS shot in Traditional Chinese "
                                         "(e.g. the rewritten line or performance sentence); empty for trim_head / reroll")
     fix_detail_en: str = Field(default="", description="the same fix_detail in English; empty when fix_detail is empty")
+    fix_detail_ja: str = Field(default="", description="the same fix_detail in Japanese; empty when fix_detail is empty")
     new_text: str = Field(default="", description="REQUIRED for edit_line / edit_performance: the full replacement "
                                                   "sentence, in the same language as the original; empty for other actions")
 
@@ -143,8 +149,9 @@ def diagnose(shot_info: dict, prompt: str, verify: dict, marks: list[str], contr
             continue
         if any(x["symptom_id"] == s["id"] for x in picks):
             continue
-        picks.append(_option(s, p.cause_index, cited, facts, by="agent", reasoning=_tr(p.reasoning, p.reasoning_en),
-                             fix_detail=_tr(p.fix_detail, p.fix_detail_en) if p.fix_detail else None,
+        picks.append(_option(s, p.cause_index, cited, facts, by="agent",
+                             reasoning=_tr(p.reasoning, p.reasoning_en, p.reasoning_ja),
+                             fix_detail=_tr(p.fix_detail, p.fix_detail_en, p.fix_detail_ja) if p.fix_detail else None,
                              new_text=p.new_text))
     if not picks:
         out = _fallback(cands, "the model's picks had no valid citation", facts)
@@ -160,22 +167,26 @@ def diagnose(shot_info: dict, prompt: str, verify: dict, marks: list[str], contr
 NEEDS_REGEN = {"reroll", "edit_performance", "edit_line", "edit_voice_role", "lengthen_shot"}
 RENDER = "本機約 8 分鐘"   # H3 四步一鏡 8 秒：實測 429～459 秒
 RENDER_EN = "about 8 minutes locally"
+RENDER_JA = "ローカルで約 8 分"
 
 
 def _tradeoff(action: str, f: dict) -> dict:
     """每種修法的代價，用量到的數字寫，不讓模型寫（實測：模型寫「剪頭只移除約 0.1 秒」，實際 4.2 秒；
-    寫「改表演句不用重新渲染」，實際要重生 —— 數字要量不要算）。中英兩份，數字同一份。"""
+    寫「改表演句不用重新渲染」，實際要重生 —— 數字要量不要算）。中英日三份，數字同一份。"""
     trim, secs = float(f.get("trim") or 0), float(f.get("seconds") or 0)
     left = max(secs - trim, 0)
     if action == "trim_head":
         return _tr(f"不用重生；剪掉開頭 {trim:.1f} 秒（這一鏡 {secs:.1f} 秒 → 剩 {left:.1f} 秒），開口前的動作會一起剪掉",
                    f"No re-render; cuts the first {trim:.1f} s (this shot {secs:.1f} s → {left:.1f} s), "
-                   "and any action before the line goes with it")
+                   "and any action before the line goes with it",
+                   f"再生成なし。最初の {trim:.1f} 秒を切る（このカット {secs:.1f} 秒 → {left:.1f} 秒）。セリフ前の動作も一緒に切れる")
     if action == "edit_performance":
         return _tr(f"要重生一次（{RENDER}）；照新的表演句重演，動作會換掉",
-                   f"One re-render ({RENDER_EN}); the shot is acted again from the new performance")
+                   f"One re-render ({RENDER_EN}); the shot is acted again from the new performance",
+                   f"再生成 1 回（{RENDER_JA}）。新しい演技指示で演じ直すので、動作は変わる")
     if action == "lengthen_shot":
-        return _tr(f"要重生一次（{RENDER}）；這一鏡加 1 秒", f"One re-render ({RENDER_EN}); the shot gets 1 s longer")
+        return _tr(f"要重生一次（{RENDER}）；這一鏡加 1 秒", f"One re-render ({RENDER_EN}); the shot gets 1 s longer",
+                   f"再生成 1 回（{RENDER_JA}）。このカットを 1 秒長くする")
     zh = {"reroll": f"提示詞不改，重生一次（{RENDER}），結果是隨機的",
           "edit_line": f"要重生一次（{RENDER}）；台詞換了，字幕跟著換",
           "edit_voice_role": f"要重生一次（{RENDER}）；只改台詞那一行的寫法",
@@ -184,18 +195,22 @@ def _tradeoff(action: str, f: dict) -> dict:
           "edit_line": f"One re-render ({RENDER_EN}); the line changes and so does the subtitle",
           "edit_voice_role": f"One re-render ({RENDER_EN}); only the dialogue line's wording changes",
           "human": "No re-render; a person takes a look and decides"}.get(action, "")
-    return _tr(zh, en)
+    ja = {"reroll": f"プロンプトはそのまま、再生成 1 回（{RENDER_JA}）。結果はランダム",
+          "edit_line": f"再生成 1 回（{RENDER_JA}）。セリフが変わり、字幕も変わる",
+          "edit_voice_role": f"再生成 1 回（{RENDER_JA}）。セリフ行の書き方だけを変える",
+          "human": "再生成なし。人が確認してから決める"}.get(action, "")
+    return _tr(zh, en, ja)
 
 
 def _ev_text(s: dict, cited: list[str]) -> dict:
-    """引用的證據照候選的標準寫法顯示（模型抄的格式每次不同），中英各一份；對照鏡號兩種語言一樣。"""
-    zh, en = [], []
+    """引用的證據照候選的標準寫法顯示（模型抄的格式每次不同），中英日各一份；對照鏡號三種語言一樣。"""
+    out: dict[str, list[str]] = {"zh": [], "en": [], "ja": []}
     for e in cited:
         i = next((i for i, x in enumerate(s["evidence"]) if (x.split("=")[0].split("（")[0] in e
                                                              or (x.startswith("human:") and x.split(":", 1)[1] in e))), None)
-        zh.append(s["evidence"][i] if i is not None else e)
-        en.append(s.get("evidence_en", s["evidence"])[i] if i is not None else e)
-    return {"zh": list(dict.fromkeys(zh)), "en": list(dict.fromkeys(en))}
+        for lang, key in (("zh", "evidence"), ("en", "evidence_en"), ("ja", "evidence_ja")):
+            out[lang].append(s.get(key, s["evidence"])[i] if i is not None else e)
+    return {k: list(dict.fromkeys(v)) for k, v in out.items()}
 
 
 def _option(s: dict, ci: int, evidence: list[str], facts: dict, *, by: str, reasoning: dict | None = None,
@@ -206,10 +221,12 @@ def _option(s: dict, ci: int, evidence: list[str], facts: dict, *, by: str, reas
         # 這幾種修法程式自己知道要做什麼（剪幾秒是量的、加長固定 +1 秒）；模型的補充說明會自己編數字
         #    （實測：「剪掉開頭約 0.1 秒」，實際 4.2 秒；「加長 0.3 秒」，apply_fix 實際加 1 秒）→ 不收
         fix_detail = None
-    return {"symptom_id": s["id"], "title": s["title"], "cause": _tr(c["cause"], c.get("cause_en", "")),
-            "action": action, "fix": _tr(c["fix"]["zh"], c["fix"].get("en", "")),
+    return {"symptom_id": s["id"], "title": s["title"],
+            "cause": _tr(c["cause"], c.get("cause_en", ""), c.get("cause_ja", "")),
+            "action": action, "fix": _tr(c["fix"]["zh"], c["fix"].get("en", ""), c["fix"].get("ja", "")),
             "fix_detail": fix_detail or {}, "new_text": new_text, "evidence": _ev_text(s, evidence),
-            "reasoning": reasoning or {}, "example": c.get("example"), "source": c.get("source"), "source_en": c.get("source_en"), "by": by,
+            "reasoning": reasoning or {}, "example": c.get("example"), "source": c.get("source"),
+            "source_en": c.get("source_en"), "source_ja": c.get("source_ja"), "by": by,
             "tradeoff": _tradeoff(action, facts), "regenerate": action in NEEDS_REGEN}
 
 

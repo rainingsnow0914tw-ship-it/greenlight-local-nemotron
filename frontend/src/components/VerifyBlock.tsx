@@ -19,7 +19,7 @@ const LL = (v: TrList | undefined, lang: Lang): string[] =>
 type Pick = {
   symptom_id: string; title: Record<string, string>; cause: Tr; action: string; fix: Tr; fix_detail: Tr
   new_text: string; evidence: TrList; reasoning: Tr; example?: { before: string; after: string }; source?: string
-  source_en?: string; applied?: Tr; by?: 'agent' | 'rule'; tradeoff?: Tr; regenerate?: boolean
+  source_en?: string; source_ja?: string; applied?: Tr; by?: 'agent' | 'rule'; tradeoff?: Tr; regenerate?: boolean
 }
 export type Verify = { checks?: Check[]; images?: Record<string, string>; marks?: string[]; passed?: boolean; heard?: string; trim_head?: number }
 export type Diagnosis = {
@@ -165,7 +165,7 @@ export function VerifyBlock({ lang, projectId, order, shotId, verify, diagnosis,
                       <div><span className="tag good">{t.after}</span><code>{p.example.after}</code></div>
                     </div>
                   )}
-                  {p.source && <div className="section-note"><b>{t.source}{sep}</b>{lang !== 'zh' && p.source_en ? p.source_en : p.source}</div>}
+                  {p.source && <div className="section-note"><b>{t.source}{sep}</b>{lang === 'ja' ? (p.source_ja ?? p.source_en ?? p.source) : lang === 'en' ? (p.source_en ?? p.source) : p.source}</div>}
                   {p.applied ? <div className="notice">{t.applied}{L(p.applied, lang)}</div> : off ? <div className="section-note">{t.notChosen}</div> : (
                     <PickAction t={t} busy={busy} editable={editable} prefill={prefill}
                       label={p.action === 'edit_line' ? t.newLine : t.newPerf}

@@ -8,6 +8,7 @@
  * 資料來源：GET /api/projects/{id}/segments/{order}/direct（後端每一步都寫進 direction_log），每 3 秒輪詢。
  */
 import { useEffect, useRef, useState } from 'react'
+import { AiText } from './AiText'
 import type { Lang } from '../api'
 
 type LogEntry = { t: number; kind: string; [k: string]: unknown }
@@ -204,7 +205,7 @@ export function DirectionPanel({ lang, projectId, order, onDone }: {
                 {t.critique(String(e.verdict), notes.length)}
                 {(e.dropped as number) > 0 && <span className="direction-warn"> · {t.dropped(e.dropped as number)}</span>}
                 {notes.map((n, j) => <div key={j} className="direction-sub">
-                  {(n.shots ?? []).join('、')}：「{n.quote}」— {n.problem}</div>)}
+                  {(n.shots ?? []).join(lang === 'en' ? ', ' : '、')}{lang === 'en' ? ': ' : '：'}「{n.quote}」— <AiText text={n.problem} lang={lang} projectId={projectId} /></div>)}
               </li>
             }
             if (e.kind === 'scene_done') return <li key={i} className="ok"><span className="direction-at">{at}</span>

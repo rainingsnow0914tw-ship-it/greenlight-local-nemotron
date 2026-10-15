@@ -104,22 +104,25 @@ def apply_fix(state, segment, shot, record, pick: dict) -> dict:
     if action == "trim_head":
         record.trim_head = float((record.verify or {}).get("trim_head") or 0.0) or record.trim_head
         return _tr(f"成片時剪掉開頭 {record.trim_head} 秒（不用重生）",
-                   f"The first {record.trim_head} s will be cut when finishing (no re-render)")
+                   f"The first {record.trim_head} s will be cut when finishing (no re-render)",
+                   f"仕上げで最初の {record.trim_head} 秒を切ります（再生成なし）")
     if action == "edit_voice_role":
         shot.voice_role = "character"
         return _tr("這一鏡標成角色講話：台詞行會寫「<名字>用<聲音>說」，重拍就對嘴",
-                   "Marked as the character's line: the prompt names who speaks in which voice, so the retake lip-syncs")
+                   "Marked as the character's line: the prompt names who speaks in which voice, so the retake lip-syncs",
+                   "キャラクターのセリフに指定：誰がどの声で話すかを書くので、撮り直すと口が合います")
     if action == "edit_performance" and new:
         shot.performance = new
-        return _tr(f"表演句改成：{new}", f"Performance changed to: {new}")
+        return _tr(f"表演句改成：{new}", f"Performance changed to: {new}", f"演技の指示を変更：{new}")
     if action == "edit_line" and new:
         if shot.dialogue_lines:
             shot.dialogue_lines[0]["text"] = new
         shot.dialogue = new
-        return _tr(f"台詞改成：{new}", f"Line changed to: {new}")
+        return _tr(f"台詞改成：{new}", f"Line changed to: {new}", f"セリフを変更：{new}")
     if action == "lengthen_shot":
         shot.engine_duration_seconds = round(float(shot.engine_duration_seconds or shot.total_seconds) + 1.0, 1)
-        return _tr(f"這一鏡加長到 {shot.engine_duration_seconds} 秒", f"Shot lengthened to {shot.engine_duration_seconds} s")
+        return _tr(f"這一鏡加長到 {shot.engine_duration_seconds} 秒", f"Shot lengthened to {shot.engine_duration_seconds} s",
+                   f"このカットを {shot.engine_duration_seconds} 秒に延長")
     if action == "reroll":
-        return _tr("提示詞不改，重拍換種子", "Same prompt, retake with a new seed")
-    return _tr("請人確認，不用重生", "A person checks it; no re-render")
+        return _tr("提示詞不改，重拍換種子", "Same prompt, retake with a new seed", "プロンプトはそのまま、シードを変えて撮り直し")
+    return _tr("請人確認，不用重生", "A person checks it; no re-render", "人が確認します（再生成なし）")

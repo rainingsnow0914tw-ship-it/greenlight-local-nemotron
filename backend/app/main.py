@@ -32,6 +32,7 @@ env_boot.load()
 
 from .routes import casting as casting_routes  # noqa: E402
 from .routes import config as config_routes  # noqa: E402
+from .routes import ui as ui_routes  # noqa: E402
 from .routes import media as media_routes  # noqa: E402
 from .routes import projects as project_routes  # noqa: E402
 from .routes import prompts as prompt_routes  # noqa: E402
@@ -107,6 +108,7 @@ app.include_router(verify_routes.router, prefix="/api/projects", tags=["verify"]
 app.include_router(verify_routes.symptoms_router, prefix="/api", tags=["verify"])
 # 成片流程：剪頭 → 放大 → 轉場 → 接片 → 燒字幕（services/finish.py）
 app.include_router(finish_routes.router, prefix="/api/projects", tags=["finish"])
+app.include_router(ui_routes.router, prefix="/api/ui", tags=["ui"])
 
 
 @app.get("/api/health")

@@ -9,6 +9,7 @@
  */
 
 import { Icon } from './Icons'
+import { AiText } from './AiText'
 import { SEGMENT_STATUS } from '../sysText'
 import { useCallback, useEffect, useState } from 'react'
 import {
@@ -163,7 +164,7 @@ export function ProjectView({
           </div>
           {sp.warnings.map((w, i) => (
             <div className="notice" key={i}>
-              {w}
+              <AiText text={w} lang={lang} projectId={projectId} />
             </div>
           ))}
         </section>
@@ -297,7 +298,7 @@ export function ProjectView({
                 <div className="segment-no">{s.order}</div>
                 <div>
                   <p className="segment-title">{s.title}</p>
-                  <p className="segment-synopsis">{s.synopsis}</p>
+                  <p className="segment-synopsis"><AiText text={s.synopsis} lang={lang} projectId={projectId} /></p>
                   <span className={`badge ${s.status === 'done' ? 'done' : 'not-started'}`}>
                     {SEGMENT_STATUS[s.status]?.[lang] ?? s.status_label}
                   </span>
@@ -361,12 +362,12 @@ export function ProjectView({
                 {scenes.map((s) => (
                   <tr key={s.scene_number}>
                     <td className="num key">{s.scene_number}</td>
-                    <td>{s.location || '—'}</td>
+                    <td>{s.location ? <AiText text={s.location} lang={lang} projectId={projectId} /> : '—'}</td>
                     <td className="num">{s.time_of_day}</td>
                     <td className="num" style={{ textAlign: 'right' }}>
                       {s.estimated_seconds.toFixed(0)}
                     </td>
-                    <td>{s.action}</td>
+                    <td><AiText text={s.action} lang={lang} projectId={projectId} /></td>
                     <td>
                       <button
                         className="btn ghost"

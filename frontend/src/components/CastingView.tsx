@@ -16,6 +16,7 @@
  */
 
 import { Icon } from './Icons'
+import { AiText } from './AiText'
 import { sysText } from '../sysText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -197,6 +198,7 @@ export function CastingView({ copy, lang, projectId, onError, onGateChange }: Pr
         <CharacterPanel
           copy={copy}
           lang={lang}
+          projectId={projectId}
           session={session}
           aspectRatio={state.aspect_ratio || '16:9'}
           roundCost={state.round_cost_usd}
@@ -258,6 +260,7 @@ export function CastingView({ copy, lang, projectId, onError, onGateChange }: Pr
 interface PanelProps {
   copy: Copy
   lang: Lang
+  projectId: string
   session: CastingSession
   /** 專案影片比例 —— 卡片框跟著它（圖已按專案比例生成） */
   aspectRatio: string
@@ -285,6 +288,7 @@ interface PanelProps {
 function CharacterPanel({
   copy,
   lang,
+  projectId,
   session,
   aspectRatio,
   roundCost,
@@ -577,8 +581,8 @@ function CharacterPanel({
                     <div className="casting-noimage">{copy.castingImageFailed}</div>
                   )}
                   <figcaption>
-                    <p className="casting-interp">{cand.interpretation}</p>
-                    <p className="casting-basis">{cand.inference_note}</p>
+                    <p className="casting-interp"><AiText text={cand.interpretation} lang={lang} projectId={projectId} /></p>
+                    <p className="casting-basis"><AiText text={cand.inference_note} lang={lang} projectId={projectId} /></p>
                     <span className="casting-roundno">
                       {copy.castingRound.replace('{n}', String(cand.round_number))}
                     </span>
