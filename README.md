@@ -228,16 +228,24 @@ I ship updates continuously. The plan:
 
 ---
 
-## 💻 Running it
+## 💻 Install
 
-**Full pipeline:** Windows 10/11 64-bit, an NVIDIA GPU with 24 GB of memory (developed on an RTX 5090
-laptop GPU), 32 GB of RAM or more, at least 50 GB of free disk for ComfyUI and the models, and a Nebius
-Token Factory API key.
+1. Download **`GreenlightLocal-Setup.exe`** from this repository's
+   [Releases](../../releases) page and run it. Windows may show a SmartScreen warning because the
+   installer is not code-signed; choose **More info → Run anyway**.
+2. Open **Greenlight Local** from the Start menu or the desktop shortcut.
+3. The project list already holds **Sample — 第10章 場景61**, a complete run you can open right away.
+   No GPU, no API key and no setup are needed to look through it.
 
-**Without a GPU:** reading, staging, directing, the line director and the study subtitle preview all
-work. Rendering and finishing need the GPU.
+| To… | You need |
+|---|---|
+| Look through the sample | Windows 10/11 64-bit |
+| Read, stage and direct your own script, and use the line director | a Nebius Token Factory API key |
+| Render video and finish films | an NVIDIA GPU with 24 GB of memory (developed on an RTX 5090 laptop GPU), 32 GB of RAM, about 50 GB of free disk for ComfyUI and the models |
 
-From source:
+The interface is in English, Chinese and Japanese; switch at the top right.
+
+From source, for developers:
 
 ```bash
 python -m venv .venv
@@ -246,13 +254,36 @@ cd frontend && npm install && npx vite build --outDir ../backend/app/static --em
 .venv\Scripts\python desktop\launcher.py
 ```
 
-Open Settings, paste your Nebius key, run the machine check, and let the one-click installer set up
-ComfyUI and the models, or point it at a ComfyUI you already run. The speech-recognition model (about
-3 GB) downloads the first time a shot is checked.
+---
 
-Rendering takes about 7.5 minutes per 8-second shot on the development GPU. MiniMax H3's license
-excludes use in the United States, the European Union, the United Kingdom and South Korea; the app shows
-the license and asks for acceptance before installing it. Tested on Windows.
+## 🧭 Using it
+
+**The sample (read only).** Open **Sample — 第10章 場景61** to see one finished run: the parsed script,
+staging, the director's rounds and what the gates caught, the producer's notes, the test shot with its
+checks and diagnosis, the study-mode line table and notes, and the finished film with readings and two
+subtitles. It is read only, so you can click around without changing it.
+
+**Your own film.**
+
+1. **Settings → ② Your keys.** Paste a Nebius Token Factory key and press **Test**.
+2. **Settings → ① This computer.** Run the check. If you will render, let the one-click installer set up
+   ComfyUI and the models, or point it at a ComfyUI you already run. MiniMax H3's license excludes the
+   United States, the European Union, the United Kingdom and South Korea; the app shows it and asks for
+   acceptance first.
+3. **Home → Drop your script here.** A novel chapter, a screenplay or plain prose (txt, md, docx, pdf,
+   fountain). Review what was read and continue.
+4. **Look.** Pick the visual style and how the story is told. To make a study film, turn on **Study mode**
+   on the project page and choose the spoken language and your subtitle languages.
+5. **Casting.** Lock in each character's look.
+6. **Open a part → Start directing.** Nemotron writes the shot list; the progress panel shows every round,
+   what the gates caught and the producer's notes. In study mode, press **Direct the lines** next.
+7. **Run test shot**, look at the checks and the diagnosis, then **Approve and unlock batch** and render
+   the rest shot by shot.
+8. **Finish this part.** Trim, upscale, transitions, join and subtitles in one pass, then download.
+
+Rendering takes about 7.5 minutes per 8-second shot on the development GPU. The speech-recognition model
+for the checks (about 3 GB) downloads the first time a shot is checked. The symptom library and the
+director's rules are in **Settings → ⑥ Knowledge**; edit them in any text editor. Tested on Windows.
 
 ---
 

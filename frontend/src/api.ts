@@ -1,3 +1,4 @@
+import { uiText } from './sysText'
 /**
  * API client。
  *
@@ -16,7 +17,7 @@ export async function send(url: string, init?: RequestInit): Promise<void> {
   } catch {
     /* 回應不是 JSON：用狀態碼 */
   }
-  throw new Error(msg)
+  throw new Error(uiText(msg))
 }
 
 export type Lang = 'zh' | 'en' | 'ja'
@@ -81,7 +82,7 @@ async function get<T>(path: string): Promise<T> {
     } catch {
       // 不是 JSON（基礎設施層的錯誤），保留原文前 200 字
     }
-    throw new Error(`${res.status} ${path}\n${detail}`)
+    throw new Error(`${res.status} ${path}\n${uiText(detail)}`)
   }
   return res.json() as Promise<T>
 }
@@ -367,7 +368,7 @@ export const api = {
   remove: async (id: string) => {
     const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' })
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`)
+    if (!res.ok) throw new Error(uiText(data.detail || `HTTP ${res.status}`))
     return data as {
       deleted: string
       title: string
@@ -515,7 +516,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
     },
     340_000,
   )
-  if (!res.ok) throw new Error(await errorMessage(res))
+  if (!res.ok) throw new Error(uiText(await errorMessage(res)))
   return (await res.json()) as T
 }
 
@@ -682,7 +683,7 @@ export const castingApi = {
       { method: 'DELETE' },
     )
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`)
+    if (!res.ok) throw new Error(uiText(data.detail || `HTTP ${res.status}`))
     return data as { session: CastingSession; gate: CastingGate; stage: string }
   },
 
@@ -697,7 +698,7 @@ export const castingApi = {
       { method: 'POST', body: form },
     )
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || data.message || `HTTP ${res.status}`)
+    if (!res.ok) throw new Error(uiText(data.detail || data.message || `HTTP ${res.status}`))
     return data as { session: CastingSession; gate: CastingGate }
   },
 
@@ -707,7 +708,7 @@ export const castingApi = {
       { method: 'DELETE' },
     )
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`)
+    if (!res.ok) throw new Error(uiText(data.detail || `HTTP ${res.status}`))
     return data as { session: CastingSession; gate: CastingGate }
   },
 }
@@ -919,7 +920,7 @@ export const videoApi = {
       method: 'DELETE',
     })
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`)
+    if (!res.ok) throw new Error(uiText(data.detail || `HTTP ${res.status}`))
     return data as { cleared_clips: number; unlocked_voices: string[]; batch: BatchState }
   },
 
@@ -1022,7 +1023,7 @@ export const mediaApi = {
       { method: 'DELETE' },
     )
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`)
+    if (!res.ok) throw new Error(uiText(data.detail || `HTTP ${res.status}`))
     return data as {
       deleted: boolean
       uri?: string

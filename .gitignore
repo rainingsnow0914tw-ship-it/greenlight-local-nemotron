@@ -58,3 +58,9 @@ submission/demo-video/旁白/_原檔備份/
 submission/demo-video/旁白/*.mp4
 submission/demo-video/旁白/*.log
 submission/demo-video/旁白/*.jpg
+
+# 內建範例（scripts/make_sample.py 產生、打包進安裝檔；媒體大，不進 git）
+sample/
+
+# 安裝檔產出（Inno Setup）
+dist_installer/

@@ -63,7 +63,32 @@ async def lifespan(app: FastAPI):
             "設定檔與 schema 不同步，服務拒絕啟動：\n  - " + "\n  - ".join(problems)
         )
     logger.info("設定檔一致性檢查通過")
+    try:   # 內建範例：第一次開 app 放進專案清單（失敗不能擋啟動）
+        from .services import sample
+
+        logger.info("sample: %s", sample.install_if_needed())
+    except Exception:  # noqa: BLE001
+        logger.exception("sample install failed")
     yield
+
+
+SAMPLE_READ_ONLY = (
+    "This is the built-in sample — a finished run to look through, read only. "
+    "To try it yourself, start a new project with your own script."
+)
+
+
+async def _sample_read_only(request, call_next):
+    """內建範例是「做好的一次完整流程」，給人看懂系統在做什麼，不讓人重跑或改掉（只准刪除整個範例）。
+    擋在唯一的入口：所有寫入範例專案的請求一律 403，畫面會照實顯示原因。"""
+    from fastapi.responses import JSONResponse
+
+    path, method = request.url.path, request.method
+    if method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/projects/p-sample-"):
+        rest = path[len("/api/projects/"):].strip("/")
+        if not (method == "DELETE" and "/" not in rest):     # 刪除整個範例專案可以
+            return JSONResponse({"detail": SAMPLE_READ_ONLY}, status_code=403)
+    return await call_next(request)
 
 
 app = FastAPI(
@@ -72,6 +97,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.middleware("http")(_sample_read_only)
 
 # 開發期允許 Vite dev server。
 # 正式部署時前端會跟 API 同源，這段就用不到了。

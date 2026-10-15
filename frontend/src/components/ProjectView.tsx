@@ -154,6 +154,17 @@ export function ProjectView({
         </div>
       </div>
 
+      {/* 內建範例（services/sample.py）：讓人一眼知道這是示範、可以直接看過程與結果 */}
+      {projectId.startsWith('p-sample-') && (
+        <div className="notice">
+          {{
+            zh: '這是內建範例：用 Greenlight Local 完整跑完一次的流程，只供瀏覽、不能修改。每一步的過程和結果都在這裡：導演回合、查證與診斷、學語言台詞、成片。要自己做，請回首頁用自己的劇本開新專案（安裝與使用說明在 README）。',
+            en: 'Built-in sample: one complete run of Greenlight Local, read only. Every step and its result is here to look through: the director’s rounds, shot checks and diagnosis, study-mode lines, and the finished film. To make your own, go back and start a new project with your own script (setup and usage are in the README).',
+            ja: '内蔵サンプル：Greenlight Local で一通り作り終えた流れです（閲覧のみ、変更はできません）。各ステップの過程と結果をここで見られます：監督のラウンド、検証と診断、学習用のセリフ、完成映像。自分で作るには、ホームに戻って自分の台本で新しいプロジェクトを始めてください（導入と使い方は README にあります）。',
+          }[lang]}
+        </div>
+      )}
+
       {sp && sp.warnings.length > 0 && (
         <section className="section">
           <div className="section-head">

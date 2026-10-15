@@ -15,6 +15,7 @@ import {
   type CSSProperties,
 } from 'react'
 import { api, type Lang, type ProgressSummary } from './api'
+import { setUiLang } from './sysText'
 import { COPY, LANGS, STAGE_DESCRIPTIONS, STAGE_NAMES, STAGE_ORDER } from './i18n'
 import { Icon, IconDefs, Logo, STAGE_ICONS } from './components/Icons'
 import { LearningPanel } from './components/LearningPanel'
@@ -88,6 +89,7 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null)
 
   const c = COPY[lang]
+  setUiLang(lang)   // 伺服器錯誤訊息照介面語言翻（sysText.ts）
 
   useEffect(() => {
     // 讀不到就當正式版 —— 寧可讓按鈕可按（後端還有守衛），

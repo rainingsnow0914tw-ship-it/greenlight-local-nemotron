@@ -20,6 +20,11 @@ const EXACT: Record<string, Tr> = {
     en: 'Casting has not been done yet. Lock in each character’s look first so they look the same in every shot.',
     ja: 'まだキャスティングしていません。各キャラクターの見た目を先に決めると、全カットで同じ人物になります。',
   },
+  'This is the built-in sample — a finished run to look through, read only. To try it yourself, start a new project with your own script.': {
+    zh: '這是內建範例：一次已經完成的流程，只供瀏覽、不能修改。要自己試，請用自己的劇本開一個新專案。',
+    en: 'This is the built-in sample — a finished run to look through, read only. To try it yourself, start a new project with your own script.',
+    ja: 'これは内蔵サンプルです（完了済みの流れを見るためのもので、変更できません）。試すには、自分の台本で新しいプロジェクトを作ってください。',
+  },
   'Directed by Nemotron with pre-render gates and a producer review': {
     zh: '由 Nemotron 導演，生成前過關卡、再經製作人審稿',
     en: 'Directed by Nemotron with pre-render gates and a producer review',
@@ -65,4 +70,13 @@ export function sysText(text: string | null | undefined, lang: Lang): string {
     if (m) return p.tr(m)[lang]
   }
   return text
+}
+
+/** 目前的介面語言（App 切語言時設定）：api.ts 丟出伺服器錯誤之前用它翻成介面語言。 */
+let current: Lang = 'en'
+export function setUiLang(lang: Lang): void {
+  current = lang
+}
+export function uiText(text: string): string {
+  return sysText(text, current)
 }
