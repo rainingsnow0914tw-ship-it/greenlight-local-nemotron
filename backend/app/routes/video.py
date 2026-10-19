@@ -65,6 +65,21 @@ def _segment(state, order: int) -> Segment:
     return segment
 
 
+def _recorded_clip_uri(project_id: str, clip_id: str) -> str | None:
+    """專案記錄裡這一鏡的影片 URI（批次片段優先，其次試拍）。沒有回 None。"""
+    state = project_store.get_store().load(project_id)
+    if not state:
+        return None
+    for seg in state.segments:
+        for clip in seg.clips:
+            if clip.shot_id == clip_id and clip.uri:
+                return clip.uri
+    for seg in state.segments:
+        if seg.test_shot and seg.test_shot.shot_id == clip_id and seg.test_shot.uri:
+            return seg.test_shot.uri
+    return None
+
+
 def _casting_status(state) -> tuple[bool, str, list[str]]:
     """選角關卡的現況。回 (過了沒, 人話原因, 還缺哪些角色)。
 
@@ -267,6 +282,8 @@ def run_test_shot(project_id: str, order: int, shot_id: str | None = None) -> di
     # 選角硬性閘門。試拍也是生成，也要選完角才准跑。
     _require_casting(state)
     shot = _pick_shot(segment, shot_id, state.style_id or "")
+    base = _snapshot(state, segment)   # 結尾只合併這段時間的增量（_commit）
+    _TS = ("test_shot", "test_shot_id", "test_shot_approved")
 
     tier = (state.chosen_tier.value if state.chosen_tier else None) or config_loader.default_veo_tier()
     tier_cfg = config_loader.veo_tier(tier)
@@ -296,12 +313,17 @@ def run_test_shot(project_id: str, order: int, shot_id: str | None = None) -> di
     prompt = prompt_data["full"]
     # Greenlight Local：本機檔位用作者管線的 H3 六行寫法（學習紀錄記的就是真的送出去的這份）
     if local_engine.is_local(tier):
+        # 生成前關卡：試拍不走 _run_clip，要自己叫（才發現試拍一直沒過關卡）
+        _preflight_gates(state, segment, shot, tier)
         prompt, local_refs = local_engine.prompt_for(shot, segment, project_id, state.style_id)
 
     started_at = time.monotonic()
     try:
         if local_engine.is_local(tier):
-            result = local_engine.generate(project_id, f"{shot.shot_id}_t{attempt}", prompt, shot, ref_paths=local_refs)
+            # 使用者上傳的首幀：試拍也要用（幕後第 1 集，試拍走這裡、沒帶首幀 → 上傳的圖沒被用到）
+            ff = str(media_store.path_for(shot.user_first_frame))                 if shot.user_first_frame and media_store.path_for(shot.user_first_frame) else None
+            result = local_engine.generate(project_id, f"{shot.shot_id}_t{attempt}", prompt, shot, ref_paths=local_refs,
+                                           first_frame=ff)
         else:
             result = video_gen.generate_clip(
                 project_id,
@@ -337,7 +359,7 @@ def run_test_shot(project_id: str, order: int, shot_id: str | None = None) -> di
             prompt=prompt,
         )
         _flush_ledger(state, segment, failed, "error", reason=str(exc)[:120])
-        project_store.get_store().save(state)
+        _commit(project_id, order, state, segment, base, segment_fields=_TS)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     cost = round(result.seconds * per_second, 3)
@@ -390,7 +412,7 @@ def run_test_shot(project_id: str, order: int, shot_id: str | None = None) -> di
         choice=f"第 {order} 段試拍 {shot.shot_id}",
         rationale=f"{result.seconds} 秒 · {result.width}×{result.height} · ${cost}",
     )
-    project_store.get_store().save(state)
+    state, segment = _commit(project_id, order, state, segment, base, segment_fields=_TS)
 
     return {
         "record": {
@@ -668,15 +690,21 @@ def _batch_payload(project_id: str, segment: Segment, state) -> dict:
 
 @router.get("/{project_id}/segments/{order}/batch")
 def batch_status(project_id: str, order: int) -> dict:
-    """批次生成的進度與下一鏡報價。**$0。**"""
-    state = _load(project_id)
-    segment = _segment(state, order)
-    payload = _batch_payload(project_id, segment, state)
-    project_store.get_store().save(state)
-    return payload
+    """批次生成的進度與下一鏡報價。**$0。**
+
+    在 mutate 裡算（有鎖、讀最新）：_batch_payload 會補 clip 要存，以前 load→save 整份寫回，
+    開面板那一下剛好撞上背景工作就把它寫的蓋掉（審查）。"""
+    _load(project_id)   # 沒有這個專案就 404
+    out = {}
+
+    def fn(st):
+        out["payload"] = _batch_payload(project_id, _segment(st, order), st)
+
+    project_store.get_store().mutate(project_id, fn)
+    return out["payload"]
 
 
-_ROUTE_BUDGET_SECONDS = 780
+_ROUTE_BUDGET_SECONDS = 2400
 """整個「生一鏡」請求的硬性總預算。
 
 必須框在最外層：`video_gen` 內層雖然已有 420 秒硬預算，但這個 handler
@@ -684,9 +712,9 @@ _ROUTE_BUDGET_SECONDS = 780
 影片生成、看片檢核、存檔），逐個框永遠會漏，請求會卡在被框住的範圍之外
 直到平台砍掉。框最外層才是唯一能保證「一定在平台砍掉之前收手」的位置。
 
-780 = Cloud Run 的 900 秒上限減 120 秒，留給例外處理、存 clip 狀態、
-寫 ledger、回一句人話。被平台砍掉的話這些全部跑不到。
-內層的 420 秒仍然在（正常情況先觸發），這一層是兜底。
+舊值 780 = Cloud Run 的 900 秒上限減 120 秒。Local 版沒有平台上限，但本機 H3 一鏡 8 分鐘＋查證＋
+診斷（Nemotron 一次最多 420 秒、可能重問一次）會超過 13 分鐘 → 影片生好了卻被算成逾時（第三世試跑）。
+改 2400 秒（40 分鐘），比前端 45 分鐘短（api.ts post()），逾時的時候後端先收手、回得出人話。
 """
 
 
@@ -1127,7 +1155,82 @@ def _tier_enum(tier: str):
         return QualityTier.LITE_720P
 
 
-def _run_clip(
+def _preflight_gates(state, segment: Segment, shot, tier: str) -> None:
+    """生成前對這一鏡跑導演關卡，有 ERROR 就不送（批次、重拍經過 _run_clip；試拍在 run_test_shot 自己叫）。
+
+    只管本機 H3：關卡的規則是照 H3 一鏡一鏡實測出來的，雲端引擎另有自己的提示詞寫法。
+    沒有導演場景資料的鏡（舊專案、手動上傳的分鏡）沒有規則可對，照舊放行。
+    """
+    from ..director import gates
+
+    dscene = (segment.director_scenes or {}).get(shot.director_scene_id or "")
+    if not local_engine.is_local(tier) or not dscene or shot.gate_waived:   # 人看過、決定照生（routes/direction.waive_gate）
+        return
+    same = [s for s in segment.shot_list.shots if s.director_scene_id == shot.director_scene_id]
+    errors = [i for i in gates.check_shot(local_engine.gate_scene(state, dscene), local_engine.gate_shots(segment, dscene, same), shot.shot_id)
+              if i["level"] == "ERROR"]
+    if errors:
+        raise HTTPException(status_code=409, detail=f"{shot.shot_id} 沒過生成前關卡，先改分鏡再生：" +
+                            "；".join(f"[{i['rule']}] {i['msg']}" for i in errors))
+
+
+def _snapshot(state, segment: Segment) -> tuple:
+    """長工作開始時記下花費與決策的起點（_commit 用來算「這段時間多了多少」）。"""
+    return (segment.spent_usd, state.spend.video_usd, state.spend.llm_usd, len(state.decisions))
+
+
+def _commit(project_id: str, order: int, state, segment: Segment, base: tuple,
+            clip=None, segment_fields: tuple = ()):
+    """長工作（生成一鏡、試拍：5～10 分鐘）的結尾：不整份寫回，只把這一鏡的結果合併進「現在」的專案。
+
+    審查：以前開頭讀一份 state、跑完 save(state) 整份寫回 —— 這段時間台詞導演、參考卡、成片、
+    導演用 mutate 寫進去的東西，全被 8 分鐘前的舊資料蓋掉（開工.py 鐵律 5「有工作在跑不改專案」是靠人記在擋）。
+    合併的東西：這一鏡的 clip 整個換掉（狀態、影片、查證、診斷都在 clip 上）、segment_fields 列的段落欄位、
+    花費加上這段時間的增量、決策只補新的那幾筆。回傳 (最新的 state, 最新的 segment)。
+    """
+    spent0, video0, llm0, ndec0 = base
+
+    def fn(fresh):
+        sg = next(s for s in fresh.segments if s.order == order)
+        if clip is not None:
+            if sg.clips is None:
+                sg.clips = []
+            idx = next((i for i, c in enumerate(sg.clips) if c.shot_id == clip.shot_id), None)
+            if idx is None:
+                sg.clips.append(clip)
+            else:
+                sg.clips[idx] = clip
+        for f in segment_fields:
+            setattr(sg, f, getattr(segment, f))
+        sg.spent_usd = round(sg.spent_usd + (segment.spent_usd - spent0), 3)
+        fresh.spend.video_usd = round(fresh.spend.video_usd + (state.spend.video_usd - video0), 3)
+        fresh.spend.llm_usd = round(fresh.spend.llm_usd + (state.spend.llm_usd - llm0), 4)
+        fresh.decisions.extend(state.decisions[ndec0:])
+
+    fresh = project_store.get_store().mutate(project_id, fn)
+    return fresh, next(s for s in fresh.segments if s.order == order)
+
+
+_GEN_LOCKS: dict[tuple[str, int], "threading.Lock"] = {}
+_GEN_LOCKS_GUARD = __import__("threading").Lock()
+
+
+def _run_clip(project_id: str, state, segment: Segment, clip, mute_dialogue: bool = False) -> dict:
+    """同一段同一時間只准一鏡在生成（審查：API 層兩個請求同時進來，會挑到同一個 NOT_STARTED 鏡、生兩次、
+    第二份蓋第一份；前端按鈕有擋，但直接打 API 或兩個分頁就擋不住）。第二個請求直接 409，不排隊。"""
+    import threading
+
+    with _GEN_LOCKS_GUARD:
+        lock = _GEN_LOCKS.setdefault((project_id, segment.order), threading.Lock())
+    if not lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="這一段已經有一鏡在生成，等它好了再按（一段同時只生一鏡）")
+    try:
+        return _run_clip_locked(project_id, state, segment, clip, mute_dialogue)
+    finally:
+        lock.release()
+
+
+def _run_clip_locked(
     project_id: str, state, segment: Segment, clip, mute_dialogue: bool = False
 ) -> dict:
     """實際生成一個鏡頭，把結果寫進 clip。
@@ -1148,6 +1251,8 @@ def _run_clip(
 
     tier = (state.chosen_tier.value if state.chosen_tier else None) or config_loader.default_veo_tier()
     per_second = float(config_loader.veo_tier(tier).get("per_second_usd", 0.05))
+    _preflight_gates(state, segment, shot, tier)
+    base = _snapshot(state, segment)   # 結尾只合併這段時間的增量（_commit）
 
     # 跟試拍與導出用同一份提示詞組裝。
     # 如果批次用的跟使用者看過的不一樣，那個導出關卡就沒有意義了。
@@ -1171,7 +1276,11 @@ def _run_clip(
         "TTS 判斷 %s：enabled=%s voice_role=%s 有台詞=%s 無聲重拍=%s",
         shot.shot_id, _tts_on, shot.voice_role, bool(shot.dialogue), mute_dialogue,
     )
-    if _tts_on and shot.voice_role == "narrator" and shot.dialogue and not mute_dialogue:
+    # 本機 H3：畫面裡那個人的心聲不走 TTS —— 台詞行不寫主詞，H3 用她自己的聲音唸、嘴閉著
+    #    （s001_06 同提示詞三個種子 3/3；engines/local._spoken_line）。TTS 是紀錄片旁白的音色，
+    #    而且本機版不一定有雲端：失敗才退回影片模型，等於白等一次。真的第三人稱旁白（講的人不在畫面裡）照舊走 TTS。
+    _inner_voice = local_engine.is_local(tier) and shot.speaker in (shot.characters_in_frame or [])
+    if _tts_on and shot.voice_role == "narrator" and shot.dialogue and not mute_dialogue and not _inner_voice:
         from ..services import tts as tts_service
 
         try:
@@ -1215,7 +1324,14 @@ def _run_clip(
         shot,
         segment.shot_list.shots,
         max_chain=int(config_loader.veo_tier(tier).get("max_continuity_chain", 4)),
+        cards_with_frame=bool(config_loader.veo_tier(tier).get("cards_with_first_frame")),
     )
+    if not decision.allowed and not shot.first_frame_from and local_engine.is_local(tier):
+        # 斷鏈的兩人鏡：借同站位、已通過那一鏡的末幀（continuity.borrow_anchor 的條件）
+        borrowed = continuity.borrow_anchor(shot, segment.shot_list.shots, segment.clips)
+        if borrowed:
+            decision = continuity.ContinuityDecision(
+                True, borrowed, 1, f"✓ 斷鏈鏡借 {borrowed} 的末幀（同一組人、同一個人正面、已通過）。")
     first_frame = None
     frame_note = decision.note
     # 同場次被鏈長上限強制斷開時，提示詞要明講「場景不變」。
@@ -1243,7 +1359,13 @@ def _run_clip(
             "Do not move to a different place."
         )
     reference_images = _reference_images_for(shot, state, segment.order)
-    if decision.allowed:
+    user_ff = None
+    if shot.user_first_frame and media_store.path_for(shot.user_first_frame):
+        # 使用者上傳的首幀：原圖直接釘，不接上一鏡、不修畫質
+        user_ff = str(media_store.path_for(shot.user_first_frame))
+        first_frame = media_store.load(shot.user_first_frame)[0]
+        frame_note = "✓ 用你上傳的首幀。"
+    elif decision.allowed:
         prev = next(
             (c for c in segment.clips if c.shot_id == decision.source_shot_id), None
         )
@@ -1334,8 +1456,15 @@ def _run_clip(
                 tier=tier,
             )
         elif local:
-            # Greenlight Local：本機 ComfyUI（首幀接末幀還沒接進來，先只用提示詞）
-            result = local_engine.generate(project_id, take_name, prompt, shot, ref_paths=local_refs)
+            # Greenlight Local：本機 ComfyUI。要接幀的鏡：上一鏡末幀先修畫質，再釘在第 0 格（參考卡照餵）
+            ff_path = user_ff
+            if first_frame and not user_ff:
+                from ..services.finish import ANIME_STYLES
+
+                ff_path = local_engine.clean_frame(project_id, shot.shot_id, first_frame,
+                                                   anime=(state.style_id or "") in ANIME_STYLES)
+            result = local_engine.generate(project_id, take_name, prompt, shot, ref_paths=local_refs,
+                                           first_frame=ff_path)
         else:
             result = video_gen.generate_clip(
                 project_id,
@@ -1419,7 +1548,7 @@ def _run_clip(
         )
         _flush_ledger(state, segment, clip, "error", reason=str(exc)[:120])
 
-        project_store.get_store().save(state)
+        _commit(project_id, segment.order, state, segment, base, clip=clip)
         raise HTTPException(status_code=502, detail=f"{clip.shot_id} 生成失敗：{exc}") from exc
 
     # ---- 把旁白混進音軌 ----
@@ -1499,6 +1628,12 @@ def _run_clip(
         clip.warnings.append(f"↻ {note}")
     if frame_note:
         clip.warnings.append(frame_note)
+    if local:
+        gaps = local_engine.missing_refs(shot, segment, project_id)
+        if gaps:
+            # 參考圖不夠也照拍，但要講清楚：沒卡的部分只靠文字，效果很隨機
+            clip.warnings.append(f"⚠ 這一鏡沒有 {'、'.join(gaps)} 的參考圖，只用文字描述叫模型畫，"
+                                 "長相或場景每次都可能不一樣（效果很隨機）。上傳或準備參考卡可以固定下來。")
     if mute_dialogue and shot.dialogue:
         clip.warnings.append(
             "這一鏡以無聲版重拍（台詞被內容安全審查擋下）——"
@@ -1556,9 +1691,9 @@ def _run_clip(
         + (f"（第 {clip.attempts} 次）" if clip.attempts > 1 else ""),
         rationale=f"{result.seconds} 秒 · ${cost}",
     )
-    project_store.get_store().save(state)
+    fresh, fresh_segment = _commit(project_id, segment.order, state, segment, base, clip=clip)
 
-    return _batch_payload(project_id, segment, state)
+    return _batch_payload(project_id, fresh_segment, fresh)
 
 
 @router.delete("/{project_id}/segments/{order}/batch")
@@ -1628,6 +1763,10 @@ def reset_segment_progress(state, segment) -> dict:
     segment.output_built_at = ""
     segment.subtitles = {}
     segment.burned = {}
+    # 成片面板（剪頭→放大→轉場→接片→燒字幕）的成品也是舊鏡頭接的
+    segment.finish_outputs = {}
+    segment.finish_status = None
+    segment.finish_log = []
 
     if segment.test_shot or segment.test_shot_approved:
         segment.test_shot = None
@@ -1672,6 +1811,10 @@ def _audit_generated(state, shot, record) -> float:
 
     if not record.uri:
         return 0.0
+    from ..services import settings_store
+
+    if not settings_store.role_available("看片檢核"):
+        return 0.0      # 選用功能（預設走 Google）：沒金鑰就不看，不掛警告；本機查證（verify）照跑
     source = media_store.load(record.uri)
     if not source:
         return 0.0
@@ -1765,6 +1908,10 @@ def _lock_voice_if_needed(state, segment: Segment, shot, clip) -> float:
     chosen = session.selected
     if chosen is None:
         return 0.0
+    from ..services import settings_store
+
+    if not settings_store.role_available("分析音色"):
+        return 0.0      # 選用功能（預設走 Google）：沒金鑰就不鎖，聲音照選角的音色描述走
 
     source = media_store.load(clip.uri)
     if not source:
@@ -1934,7 +2081,7 @@ def _build_srt(state, segment, lang: str) -> str:
 
     try:
         mapping, usage = subtitle_translator.translate_cues(
-            [(c.index, c.text) for c in cues], lang
+            [(c.index, c.text) for c in cues], lang, state.name_glossary or ""
         )
     except demo_mode.DemoBlocked:
         # Demo 模式的擋下不是錯誤，要讓它穿透到最外層 handler
@@ -2367,7 +2514,10 @@ def get_clip(project_id: str, clip_id: str) -> Response:
     # 走 media_store.find()，本機與 GCS 的統一入口。
     # 不要自己 glob 本機目錄：那在 Cloud Run 上永遠找不到東西，
     # 而且本機測不出來（見 media_store.find 的說明）。
-    uri = media_store.find(clip_id, project_id)
+    # 先用專案記下的那一個檔：試拍存成 s001_03_t1、修過的存成 s001_05_fx，
+    # 只按「s001_03.*」找會找不到，畫面上就是一排黑框 0:00
+    # （範例專案實證）。記錄是真相，檔名搜尋只當後備。
+    uri = _recorded_clip_uri(project_id, clip_id) or media_store.find(clip_id, project_id)
     if uri is None:
         raise HTTPException(status_code=404, detail="找不到這段影片")
 

@@ -62,9 +62,9 @@ const COPY: Record<string, Localized> = {
     ja: '画調はキャラクターの見た目を決めるため、キャスティングより先に選びます。数字は初回成功率の差です。',
   },
   locked: {
-    zh: '已定調（分鏡已產生，改風格要先退回）',
-    en: 'Locked (shots planned — rewind to change)',
-    ja: '確定済み（コンテ作成済み、変更は巻き戻しから）',
+    zh: '已定調（角色照這個風格選定了，改風格要先退回）',
+    en: 'Locked (characters were cast in this style — rewind to change)',
+    ja: '確定済み（この画調でキャストを決定済み、変更は巻き戻しから）',
   },
 }
 

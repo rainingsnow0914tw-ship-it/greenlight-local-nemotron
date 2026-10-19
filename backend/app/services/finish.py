@@ -33,6 +33,7 @@ UPSCALE_MODEL = "RealESRGAN_x4plus_anime_6B.pth"   # 動畫風（作者 s3_upsca
 UPSCALE_MODEL_REAL = "RealESRGAN_x4plus.pth"      # 其他畫風（官方 v0.1.0、64MB、BSD-3）
 BLEND, CHUNK = 0.35, 48
 FADE_SCENE, FADE_FILM_IN, FADE_FILM_OUT = 0.4, 0.8, 1.0
+FLASH_OUT, FLASH_IN = 0.2, 0.25   # 閃白：正式管線 s3_assemble 的長度
 ANIME_STYLES = {"anime"}
 
 
@@ -76,7 +77,9 @@ def probe(path: Path) -> tuple[int, int, float, float]:
             int(t.group(1)) * 3600 + int(t.group(2)) * 60 + float(t.group(3)), float(f.group(1)) if f else 24.0)
 
 
-def start(project_id: str, order: int) -> bool:
+def start(project_id: str, order: int, subs_only: bool = False) -> bool:
+    """subs_only＝只重燒字幕：拿上次成片的母片（已剪頭、放大、接好、沒字幕）跟同一份字幕時間重燒，
+    不重新放大（字幕是放大之後才燒的 —— 以前改字幕版型／讀音要重跑一個多小時）。"""
     with _lock:
         if is_running(project_id, order):
             return False
@@ -86,7 +89,8 @@ def start(project_id: str, order: int) -> bool:
             sg.finish_log, sg.finish_status = [], "running"
 
         project_store.get_store().mutate(project_id, reset)
-        t = threading.Thread(target=_run, args=(project_id, order), daemon=True, name=f"finish-{project_id}-{order}")
+        t = threading.Thread(target=_run_subs if subs_only else _run, args=(project_id, order), daemon=True,
+                             name=f"finish-{project_id}-{order}")
         _running[(project_id, order)] = t
         t.start()
         return True
@@ -106,7 +110,10 @@ def _plan(state, seg) -> list[dict]:
         words = (c.verify or {}).get("words") or []
         out.append({"clip": c, "shot": shots.get(c.shot_id), "scene": (shots.get(c.shot_id).director_scene_id
                     if shots.get(c.shot_id) else ""), "trim": float(c.trim_head or 0.0),
-                    "speech": (words[0][1], words[-1][2]) if words else None})
+                    # 台詞講完後模型又多講的（checks.tail_extra）→ 剪在這一秒；講話時段也只算到台詞結束
+                    "end": float((c.verify or {}).get("trim_tail") or 0.0),
+                    "speech": (words[0][1], min(words[-1][2], float((c.verify or {}).get("trim_tail") or 1e9)))
+                    if words else None})
     return out
 
 
@@ -114,7 +121,7 @@ def _upscale_comfy(src: Path, dst: Path, tw: int, th: int, project_id: str, say,
     """作者 s3_upscale 的圖（RealESRGAN 動畫 ×4 → lanczos → 跟純 lanczos 混 0.35），48 格一段，聲音接回原片。"""
     from ..engines import comfy
 
-    url = settings_store.load().get("comfy_url", "http://127.0.0.1:8188")
+    url = settings_store.comfy_url()
     _, _, dur, fps = probe(src)
     n = int(round(dur * fps))
     with tempfile.TemporaryDirectory() as tmp:
@@ -168,10 +175,11 @@ def _run(project_id: str, order: int) -> None:
         portrait = (state.aspect_ratio or "16:9") == "9:16"
         tw, th = (1080, 1920) if portrait else (1920, 1080)
         anime = (state.style_id or "") in ANIME_STYLES
-        url = settings_store.load().get("comfy_url", "http://127.0.0.1:8188")
-        # 動畫風用動畫版模型；寫實與其他畫風用 lanczos —— 速度快、畫面差別不大
-        #    （實測 s001_06：寫實模型 880 秒／鏡、lanczos 1.4 秒，畫質差異看得出但不大）。
-        #    寫實模型留在 D 槽，settings.json 的 params.upscale_real_model=true 才用（沒做畫面開關：少一個要維護的東西）
+        url = settings_store.comfy_url()
+        # 動畫風用動畫版模型；寫實與其他畫風用 lanczos —— 兩種畫質都可以接受，選速度快的。
+        #    實測 s061_10（寫實）：動畫模型 433 秒／鏡、lanczos 1.4 秒；動畫模型睫毛唇線較利、皮膚沒變塑膠、
+        #    相鄰格差異 0.97～0.98 倍（沒殘影）—— 畫質能接受，輸在速度。（「真人用動畫模型會變塑膠」量過不成立。）
+        #    寫實模型 settings.json 的 params.upscale_real_model=true 才用（沒做畫面開關：少一個要維護的東西）
         use_real = bool(settings_store.load().get("params", {}).get("upscale_real_model"))
         model = UPSCALE_MODEL if anime else (UPSCALE_MODEL_REAL if use_real else "")
         has_model = bool(model) and _has_upscale_model(url, model)
@@ -186,29 +194,69 @@ def _run(project_id: str, order: int) -> None:
             if not src or not src.exists():
                 _log(project_id, order, "skip", shot=c.shot_id, why="file missing")
                 continue
+            # ⓪ 放好的現成品：同一個片檔＋同樣的剪頭剪尾＋同樣的放大法和尺寸 → 直接用，不重剪不重放大
+            #    （重生一兩鏡就只該重新放大那一兩鏡 —— 以前改一鏡要 23 鏡全部重放大 80 分鐘）
+            cache = src.parent / "_finish_cache" / (
+                f"{src.stem}_{p['trim']:.2f}_{p['end']:.2f}_{(model if has_model else 'lanczos').split('.')[0]}_{tw}x{th}.mp4")
+            if cache.exists() and cache.stat().st_size > 0:
+                up = cache
+                _log(project_id, order, "reuse", shot=c.shot_id, index=k + 1, of=len(plan))
+            else:
+                up = None
             # ① 剪頭
             cur = src
-            if p["trim"] > 0:
+            if up is None and (p["trim"] > 0 or p["end"] > p["trim"]):
                 cut = work / f"{k:03d}_trim.mp4"
-                ff("-ss", f"{p['trim']:.2f}", "-i", src, "-c:v", "libx264", "-crf", "14", "-c:a", "aac", cut)
+                span = ("-t", f"{p['end'] - p['trim']:.2f}") if p["end"] > p["trim"] else ()
+                ff("-ss", f"{p['trim']:.2f}", "-i", src, *span, "-c:v", "libx264", "-crf", "14", "-c:a", "aac", cut)
                 cur = cut
-                _log(project_id, order, "trim", shot=c.shot_id, seconds=p["trim"])
+                _log(project_id, order, "trim", shot=c.shot_id, seconds=p["trim"], end=p["end"] or None)
             # ② 放大
-            w, h, dur, _ = probe(cur)
-            up = work / f"{k:03d}_up.mp4"
-            if h >= th:
-                up = cur
-            elif has_model:
-                _log(project_id, order, "upscale", shot=c.shot_id, method="model", index=k + 1, of=len(plan))
-                _upscale_comfy(cur, up, tw, th, project_id, lambda i, n, sid=c.shot_id: None, model=model)
-            else:
-                ff("-i", cur, "-vf", f"scale={tw}:{th}:flags=lanczos", "-c:v", "libx264", "-crf", "16", "-c:a", "copy", up)
-                _log(project_id, order, "upscale", shot=c.shot_id, method="lanczos", index=k + 1, of=len(plan))
+            if up is None:
+                w, h, dur, _ = probe(cur)
+                up = work / f"{k:03d}_up.mp4"
+                if h >= th:
+                    up = cur
+                elif has_model:
+                    _log(project_id, order, "upscale", shot=c.shot_id, method="model", index=k + 1, of=len(plan))
+                    _upscale_comfy(cur, up, tw, th, project_id, lambda i, n, sid=c.shot_id: None, model=model)
+                else:
+                    ff("-i", cur, "-vf", f"scale={tw}:{th}:flags=lanczos", "-c:v", "libx264", "-crf", "16", "-c:a", "copy", up)
+                    _log(project_id, order, "upscale", shot=c.shot_id, method="lanczos", index=k + 1, of=len(plan))
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(up, cache)
+            # ②b 剪完再聽一次：聽寫給的秒數會偏（範例 2 s007_02：「ど」被標成 0.74 秒起、拉了半秒，
+            #    照它剪在 0.64 秒，成片裡還留著「はい。はい。」）。拿剪好放大好的這一鏡重聽，台詞前面還有字就再剪 ——
+            #    剪的是放大好的檔，不用重新放大；剪過的存回快取，下次重聽就乾淨了
+            if p["trim"] > 0 and p["shot"] is not None and (p["shot"].dialogue or "").strip():
+                try:
+                    from ..verify import asr, checks
+                    heard = asr.transcribe(str(up), checks.WHISPER_LANG.get(state.film_language, state.film_language))
+                    lead = checks._line_start(heard, p["shot"].dialogue, min_lead=2)   # 已經剪過一次，剩下的兩個音也是亂語（s007_02「でで」）
+                except Exception as exc:  # noqa: BLE001 - 重聽失敗不擋成片，照原本剪的
+                    logger.warning("re-listen failed: %s", exc)
+                    lead = None
+                more = 0.0
+                if lead:
+                    at = float(lead[1])
+                    # 台詞第一個音被拉得很長（s007_02「ど」0.20～0.72 秒）＝前面的亂語被併進去了，真正開口在它結束前
+                    first = next(((w, a, b) for w, a, b in heard if abs(a - at) < 0.01), None)
+                    if first and (first[2] - first[1]) > 0.35 * max(1, len(checks._norm(first[0]))):
+                        at = first[2] - 0.22 * max(1, len(checks._norm(first[0])))
+                    more = round(at - 0.08, 2)
+                if more > 0.05:
+                    cut2 = work / f"{k:03d}_retrim.mp4"
+                    ff("-ss", f"{more:.2f}", "-i", up, "-c:v", "libx264", "-crf", "14", "-c:a", "aac", cut2)
+                    shutil.copyfile(cut2, cache)
+                    up = cut2
+                    p["trim"] += more
+                    _log(project_id, order, "retrim", shot=c.shot_id, seconds=more, extra=lead[0])
             # ③ 轉場：淡只放在安靜段（不吃口白）
             _, _, dur, _ = probe(up)
             sp = p["speech"]
-            head_quiet = max(0.0, (sp[0] - p["trim"]) if sp else dur)
-            tail_quiet = max(0.0, (dur - (sp[1] - p["trim"])) if sp else dur)
+            # 聽寫量到的開口／講完會偏 0.2～0.3 秒（最後一鏡：淡出照「講完」算，「見られるよ」的「れるよ」被淡掉）→ 前後各留 0.3 秒
+            head_quiet = max(0.0, (sp[0] - p["trim"] - 0.3) if sp else dur)
+            tail_quiet = max(0.0, (dur - (sp[1] - p["trim"]) - 0.3) if sp else dur)
             first, last = k == 0, k == len(plan) - 1
             new_in = not first and p["scene"] != plan[k - 1]["scene"]
             new_out = not last and p["scene"] != plan[k + 1]["scene"]
@@ -216,6 +264,17 @@ def _run(project_id: str, order: int) -> None:
             fout = min(FADE_FILM_OUT if last else FADE_SCENE if new_out else 0.0, tail_quiet)
             vf = [f"scale={tw}:{th}:force_original_aspect_ratio=decrease,pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p"]
             af = ["aresample=48000"]
+            # 閃白（分鏡標 flash_before）：前一鏡最後 0.2 秒淡成白、這一鏡頭 0.25 秒從白淡回來，聲音不淡 —— 照正式管線 s3_assemble
+            flash_in = bool(p["shot"] and p["shot"].flash_before) and not first
+            flash_out = not last and bool(plan[k + 1]["shot"] and plan[k + 1]["shot"].flash_before)
+            if flash_in:
+                vf.append(f"fade=t=in:st=0:d={FLASH_IN}:color=white")
+                fin = 0.0
+            if flash_out:
+                vf.append(f"fade=t=out:st={dur - FLASH_OUT:.3f}:d={FLASH_OUT}:color=white")
+                fout = 0.0
+            if flash_in or flash_out:
+                _log(project_id, order, "flash", shot=c.shot_id, flash_in=flash_in, flash_out=flash_out)
             if fin > 0.05:
                 vf.append(f"fade=t=in:st=0:d={fin:.2f}")
                 af.append(f"afade=t=in:st=0:d={fin:.2f}")
@@ -240,12 +299,12 @@ def _run(project_id: str, order: int) -> None:
         # ⑤ 燒字幕（學語言模式）。字幕時間有台詞就算、存起來：之後對這支成片燒字幕／下載字幕檔要用同一份
         items = _cues(seg, ready, state.film_language) if seg.lines else []
         if state.study_mode and seg.lines:
-            from ..language import study_subs
+            from ..language import jobs, study_subs
 
             for lang in [x for x in state.learner_languages if x != state.film_language]:
                 _log(project_id, order, "subtitles", lang=lang, lines=len(items))
                 out = work / f"study_{lang}.mp4"
-                study_subs.burn(master, items, state.film_language, lang, out)
+                study_subs.burn(master, items, state.film_language, lang, out, names=jobs.glossary(state))
                 outputs[f"{state.film_language}-{lang}"] = media_store.save(
                     project_id, f"part{order}_{state.film_language}-{lang}", out.read_bytes(), "video/mp4")
 
@@ -264,6 +323,46 @@ def _run(project_id: str, order: int) -> None:
         store.mutate(project_id, lambda st: setattr(_seg(st, order), "finish_status", "failed"))
     finally:
         # 剪頭／放大／正規化／接片的中間檔：產出都已存進媒體庫，暫存資料夾一律清掉（一段可以到好幾 GB）
+        if work is not None:
+            shutil.rmtree(work, ignore_errors=True)
+
+
+def _run_subs(project_id: str, order: int) -> None:
+    """只重燒字幕（見 start 的 subs_only）。母片或字幕時間不在 → 失敗、請使用者跑完整成片。"""
+    from ..language import jobs, study_subs
+
+    store = project_store.get_store()
+    work = None
+    try:
+        state = store.load(project_id)
+        seg = _seg(state, order)
+        master = media_store.path_for(seg.finish_outputs.get("master") or "") if seg.finish_outputs.get("master") else None
+        if not master or not master.exists() or not seg.finish_cues:
+            raise RuntimeError("no finished master to re-subtitle — run the full finish first")
+        cues = seg.finish_cues
+        # 字幕時間沿用上次的，台詞內容（讀音、字幕）用現在的：上次之後改過台詞，要燒的是改過的版本
+        now = {ln["id"]: ln for ln in seg.lines}
+        items = [{**c, "line": now.get(c["line"].get("id"), c["line"])} for c in cues]
+        work = Path(tempfile.mkdtemp(prefix="gl_finish_"))
+        outputs = dict(seg.finish_outputs)
+        for lang in [x for x in state.learner_languages if x != state.film_language]:
+            _log(project_id, order, "subtitles", lang=lang, lines=len(items), only=True)
+            out = work / f"study_{lang}.mp4"
+            study_subs.burn(master, items, state.film_language, lang, out, names=jobs.glossary(state))
+            outputs[f"{state.film_language}-{lang}"] = media_store.save(
+                project_id, f"part{order}_{state.film_language}-{lang}", out.read_bytes(), "video/mp4")
+
+        def done(st):
+            sg = _seg(st, order)
+            sg.finish_outputs, sg.finish_status = outputs, "done"
+
+        store.mutate(project_id, done)
+        _log(project_id, order, "done", outputs=list(outputs), subs_only=True)
+    except Exception as exc:  # noqa: BLE001 - 背景工作：錯誤寫進紀錄給畫面看
+        logger.exception("re-subtitle failed")
+        _log(project_id, order, "failed", error=f"{type(exc).__name__}: {str(exc)[:300]}")
+        store.mutate(project_id, lambda st: setattr(_seg(st, order), "finish_status", "failed"))
+    finally:
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
 

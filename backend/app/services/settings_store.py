@@ -130,6 +130,14 @@ def load() -> dict:
     return merged
 
 
+COMFY_DEFAULT = "http://127.0.0.1:8189"   # app 一鍵安裝的 ComfyUI 用 8189（installer.DEFAULT_PORT；8188 多半是使用者自己的）
+
+
+def comfy_url() -> str:
+    """ComfyUI 位址的唯一出處（以前八個地方各寫各的預設，影片用 8188、生圖用 8189）。"""
+    return (load().get("comfy_url") or COMFY_DEFAULT).rstrip("/")
+
+
 def save(data: dict) -> None:
     with _lock:
         p = _path()
@@ -159,6 +167,16 @@ def role_for(action: str) -> tuple[str, dict]:
     """動作名稱 → (角色, {"provider", "model"})。不在表上的動作當文字工作，走導演那一格的設定。"""
     role = ROLES.get(action, {}).get("role", "director")
     return role, load()["roles"].get(role, DEFAULTS["roles"]["director"])
+
+
+def role_available(action: str) -> bool:
+    """這個動作設定的 AI 現在叫得動嗎（要金鑰的有金鑰）。選用的功能（看片檢核、分析音色預設走 Google）
+    沒金鑰就安靜跳過，不要每一鏡都掛一條「沒有 Google 金鑰」的警告。"""
+    _, cfg = role_for(action)
+    provider = cfg.get("provider")
+    if provider in ("nebius", "google"):
+        return bool(key(provider))
+    return provider == "local"
 
 
 def public_view() -> dict:

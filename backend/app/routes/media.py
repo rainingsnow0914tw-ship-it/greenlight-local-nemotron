@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 
 from ..services import media_store

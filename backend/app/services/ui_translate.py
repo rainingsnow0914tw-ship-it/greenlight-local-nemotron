@@ -26,11 +26,17 @@ _lock = threading.Lock()
 
 
 def detect(text: str) -> str:
-    """粗分 zh／ja／en：有假名就是日文；漢字比英文字母多就是中文；其他算英文。"""
-    if re.search(r"[぀-ヿ]", text):
-        return "ja"
+    """粗分 zh／ja／en：英文字母遠多於漢字＋假名就是英文；其次有假名是日文；漢字比英文字母多是中文。
+
+    英文先判：審稿意見常是英文句子裡引一句日文（「Typo/missing particle 'に' in '気にかけてる'…」），
+    以前「有假名就算日文」→ 日文介面當它已經是日文、不翻，畫面上留一整句英文（實證）。"""
+    kana = len(re.findall(r"[぀-ヿ]", text))
     han = len(re.findall(r"[一-鿿]", text))
     latin = len(re.findall(r"[A-Za-z]", text))
+    if latin > 2 * (kana + han):
+        return "en"
+    if kana:
+        return "ja"
     return "zh" if han * 2 > latin else "en"
 
 
@@ -65,6 +71,7 @@ def name_hints(glossary_text: str, lang: str) -> str:
         name, rest = (x.strip() for x in ln.split("=", 1))
         reading, _, english = (x.strip() for x in rest.partition("/"))
         target = {"en": english or reading or name, "ja": name, "zh": name}[lang]
+        # 🔴 這串字是翻譯快取的鍵的一部分（範例專案附了預先翻好的快取），改寫法＝快取全部失效
         aliases = [name] + ([english] if english else [])
         if lazy_pinyin and re.search(r"[一-鿿]", name):
             aliases.append("".join(lazy_pinyin(name)).capitalize())
@@ -90,6 +97,10 @@ def fix_names(text: str, glossary_text: str, lang: str) -> str:
         pin = "".join(lazy_pinyin(name)).capitalize()
         if pin and pin != target:
             text = re.sub(rf"\b{re.escape(pin)}\b", target, text)
+        # 留著假名讀音（つきね）＝沒換到名字表的寫法：中英文一定要換；日文介面也換回漢字名，
+        #   跟畫面其他地方（標題、選角、台詞表）的「月音」一致（表演句日譯寫成つきね）
+        if reading and reading != target and not re.search(r"[A-Za-z]", reading):
+            text = text.replace(reading, target)
     return text
 
 

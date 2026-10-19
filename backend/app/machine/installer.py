@@ -15,6 +15,7 @@
 import hashlib
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -25,6 +26,15 @@ from . import stack
 
 COMFY_URL = "https://github.com/comfyanonymous/ComfyUI/releases/latest/download/ComfyUI_windows_portable_nvidia.7z"
 DEFAULT_PORT = 8189          # 不用 8188：使用者自己的 ComfyUI 多半佔著 8188
+
+
+import threading
+
+CANCEL = threading.Event()   # 安裝的「取消」鈕（routes/settings 的 /machine/install/cancel 設、開始安裝時清）
+
+
+class InstallCancelled(RuntimeError):
+    """使用者按了取消（以前沒有取消鈕，按錯只能把 app 關掉）。"""
 
 
 def _download(url: str, dest: pathlib.Path, label: str, size: int = 0, sha256: str = ""):
@@ -48,6 +58,8 @@ def _download(url: str, dest: pathlib.Path, label: str, size: int = 0, sha256: s
             last = 0.0
             with open(part, "ab" if have else "wb") as f:
                 for chunk in r.iter_bytes(1 << 20):
+                    if CANCEL.is_set():   # 使用者按了取消：下到一半的 .part 留著，下次按安裝接著下
+                        raise InstallCancelled(label)
                     f.write(chunk)
                     have += len(chunk)
                     if time.time() - last > 1:
@@ -90,13 +102,66 @@ def _extract(archive: pathlib.Path, target: pathlib.Path):
     yield {"step": "extract", "status": "done", "detail": str(root)}
 
 
+def find_existing_models() -> str | None:
+    """電腦裡已經有 H3 模型的 ComfyUI models 資料夾（找不到回 None）。
+
+    範例 3：使用者已經有模型、但「已經有模型資料夾」那格沒填 → 安裝默默開始下載 42 GB。
+    找的順序：①開著的 ComfyUI（8188，問它模型放哪）②Comfy Desktop 的安裝紀錄 ③常見位置
+    （文件\\ComfyUI、各磁碟根目錄下名字有 comfy／ai-models 的資料夾，往下找三層）。只認得到 H3 的影片 VAE 才算。
+    """
+    marker = ("vae", "minimax_h3_video_vae_fp16.safetensors")
+
+    def models_dir_of(p: pathlib.Path) -> str | None:
+        return str(p) if (p / marker[0] / marker[1]).is_file() else None
+
+    # ① 開著的 ComfyUI
+    for port in (8188, 8000):
+        try:
+            data = httpx.get(f"http://127.0.0.1:{port}/internal/folder_paths", timeout=3).json()
+            for d in data.get("vae") or []:
+                d = d[0] if isinstance(d, list) else d
+                if (pathlib.Path(d) / marker[1]).is_file():
+                    return str(pathlib.Path(d).parent)
+        except Exception:  # noqa: BLE001 - 沒開就下一個
+            pass
+    roots: list[pathlib.Path] = []
+    # ② Comfy Desktop（新版）的安裝紀錄
+    inst = pathlib.Path(os.environ.get("APPDATA", "")) / "Comfy Desktop" / "installations.json"
+    try:
+        import json
+        for it in json.loads(inst.read_text(encoding="utf-8")):
+            p = pathlib.Path(it.get("installPath", ""))
+            roots += [p, p.parent, p.parent.parent]
+    except Exception:  # noqa: BLE001
+        pass
+    # ③ 常見位置
+    roots.append(pathlib.Path.home() / "Documents" / "ComfyUI")
+    for drive in "CDEFG":
+        base = pathlib.Path(f"{drive}:\\")
+        try:
+            roots += [d for d in base.iterdir() if d.is_dir() and re.search(r"comfy|ai[-_ ]?models", d.name, re.I)]
+        except OSError:
+            continue
+    seen = set()
+    for r in roots:
+        if r in seen or not r.is_dir():
+            continue
+        seen.add(r)
+        for p in [r, *r.glob("*"), *r.glob("*/*"), *r.glob("*/*/*")]:
+            if p.is_dir() and p.name.lower() == "models":
+                hit = models_dir_of(p)
+                if hit:
+                    return hit
+    return None
+
+
 def _models(target: pathlib.Path, compute_cap: float, reuse_dir: str | None):
     """模型：有現成的資料夾就寫 extra_model_paths.yaml 指過去（只讀、不搬不複製）；缺的才下載。"""
     root = comfy_dir(target)
     models_root = root / "ComfyUI" / "models"
     if reuse_dir:
         reuse = pathlib.Path(reuse_dir)
-        folders = sorted({m["folder"] for m in stack.MODELS.values()})
+        folders = sorted({m["folder"] for m in stack.MODELS.values()} | {"upscale_models"})
         yaml = "greenlight_reuse:\n" + f"  base_path: '{reuse}'\n" + "".join(f"  {f}: {f}/\n" for f in folders)
         (root / "ComfyUI" / "extra_model_paths.yaml").write_text(yaml, encoding="utf-8")
         yield {"step": "models", "status": "running", "detail": f"using existing models in {reuse} (read-only)"}
@@ -106,6 +171,16 @@ def _models(target: pathlib.Path, compute_cap: float, reuse_dir: str | None):
             yield {"step": f"model {name}", "status": "done", "detail": "found in the existing models folder"}
             continue
         yield from _download(stack.hf_url(name), models_root / m["folder"] / name, f"model {name}", m["size"], m["sha256"])
+    # 放大模型（Real-ESRGAN 兩個，共 85 MB）：成片一定會用到，跟影片模型一起裝。
+    #   範例 3：一鍵安裝只裝了影片模型，成片退回 lanczos；放大模型原本綁在「生圖模型」那包（Qwen 40 GB）裡，
+    #   使用者只為了放大要多下 40 GB。現成資料夾裡有就不下（看共用資料夾的 upscale_models）。
+    for name, m in stack.IMAGE_MODELS.items():
+        if m["folder"] != "upscale_models":
+            continue
+        if reuse_dir and (pathlib.Path(reuse_dir) / m["folder"] / name).exists():
+            yield {"step": f"model {name}", "status": "done", "detail": "found in the existing models folder"}
+            continue
+        yield from _download(stack.image_hf_url(name), models_root / m["folder"] / name, f"model {name}", m["size"], m["sha256"])
 
 
 def launch(target: pathlib.Path, port: int = DEFAULT_PORT) -> subprocess.Popen:
@@ -117,6 +192,32 @@ def launch(target: pathlib.Path, port: int = DEFAULT_PORT) -> subprocess.Popen:
     return subprocess.Popen([str(root / "python_embeded" / "python.exe"), "-s", "ComfyUI/main.py",
                              "--windows-standalone-build", "--port", str(port), "--disable-auto-launch"],
                             cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT, creationflags=flags)
+
+
+def ensure_running() -> str:
+    """app 啟動時呼叫：app 裝過 ComfyUI（設定裡有 comfy_home）而它沒在回應 → 背景啟動它。回傳做了什麼（寫 log 用）。
+
+    為什麼要有（一般使用者裝好之後，app 要自己把 ComfyUI 開起來）：
+    一鍵安裝只在裝完那一刻啟動一次；使用者重開機再開 app，影片引擎就沒了，畫面只說「沒回應」。
+    使用者自己的 ComfyUI（沒有 comfy_home）不碰 —— 那是他的，什麼時候開由他決定。
+    """
+    from ..services import settings_store
+
+    s = settings_store.load()
+    home, url = s.get("comfy_home"), s.get("comfy_url") or f"http://127.0.0.1:{DEFAULT_PORT}"
+    if not home:
+        return "no app-installed ComfyUI"
+    try:
+        if httpx.get(f"{url}/system_stats", timeout=3).status_code == 200:
+            return "already running"
+    except httpx.HTTPError:
+        pass
+    root = comfy_dir(pathlib.Path(home))
+    if not (root / "python_embeded" / "python.exe").exists():
+        return f"install folder missing: {root}"
+    port = int(url.rsplit(":", 1)[-1]) if url.rsplit(":", 1)[-1].isdigit() else DEFAULT_PORT
+    launch(pathlib.Path(home), port)
+    return f"started ComfyUI from {home} on port {port}"
 
 
 def _wait_up(port: int, seconds: int = 300):
@@ -148,11 +249,21 @@ def install(target: str, license_accepted: bool, compute_cap: float = 12.0, reus
     archive = t / "_downloads" / "ComfyUI_windows_portable_nvidia.7z"
     yield from _download(COMFY_URL, archive, "ComfyUI")
     yield from _extract(archive, t)
+    if not reuse_models:
+        # 沒填「已經有模型資料夾」→ 先找電腦裡現成的，找到就指過去，不重下 42 GB
+        reuse_models = find_existing_models()
+        if reuse_models:
+            yield {"step": "models", "status": "done", "detail": f"found models already on this computer: {reuse_models} — reusing them"}
     yield from _models(t, compute_cap, reuse_models)
     if not start:
-        yield {"step": "start", "status": "skipped", "detail": "installed; not started (GPU busy) — start it from the app later"}
+        yield {"step": "start", "status": "skipped", "detail": "installed; not started (GPU busy) — it starts by itself the next time you open the app"}
         return
-    launch(t, port)
+    try:   # 已經在跑（重按安裝補模型）就不再開第二個，搶同一個埠只會讓新的那個掛掉
+        running = httpx.get(f"http://127.0.0.1:{port}/system_stats", timeout=3).status_code == 200
+    except httpx.HTTPError:
+        running = False
+    if not running:
+        launch(t, port)
     yield from _wait_up(port)
     from . import doctor
     report = doctor.run(f"http://127.0.0.1:{port}", str(t.anchor))
@@ -186,7 +297,25 @@ def comfy_model_folders(comfy_url: str) -> dict[str, str]:
     return out
 
 
-def install_image_models(comfy_url: str, models_dir: str | None = None):
+def already_have(comfy_url: str, folder: str, name: str, size: int, fallback: str | None = None) -> bool | None:
+    """這個模型檔 ComfyUI 已經有了嗎？查它回報的**每一個**資料夾（桌面版常有三個：共用庫、內建、外掛指的路徑），
+    不是只查要下載進去的那一個 —— 只查一個的話，放在別的資料夾的檔會被當成沒有、整包重下。
+    ComfyUI 沒開又沒有 fallback 資料夾＝不知道（None）。"""
+    paths = []
+    try:
+        data = httpx.get(f"{comfy_url}/internal/folder_paths", timeout=10).json().get(folder)
+        paths = data[0] if isinstance(data, list) and data and isinstance(data[0], list) else (data or [])
+        paths = [paths] if isinstance(paths, str) else paths
+    except (httpx.HTTPError, ValueError, AttributeError):
+        paths = []
+    if fallback:
+        paths = [*paths, fallback]
+    if not paths:
+        return None
+    return any((pathlib.Path(d) / name).exists() and (pathlib.Path(d) / name).stat().st_size == size for d in paths)
+
+
+def install_image_models(comfy_url: str, models_dir: str | None = None, only_upscale: bool = False):
     """把生圖模型包（stack.IMAGE_MODELS）下載進使用者的 ComfyUI，一路 yield 進度。
 
     放哪裡：先問 ComfyUI（comfy_model_folders）；ComfyUI 沒開時用使用者在畫面上選的模型資料夾
@@ -204,8 +333,11 @@ def install_image_models(comfy_url: str, models_dir: str | None = None):
         raise RuntimeError("ComfyUI is not running, so it can't tell us where its models go — "
                            "start ComfyUI, or pick its models folder with Browse…")
     for name, m in stack.IMAGE_MODELS.items():
+        # only_upscale：只要成片放大（Real-ESRGAN 85 MB），不要 Qwen 生圖（40 GB）—— 範例 3 使用者只缺放大模型
+        if only_upscale and m["folder"] != "upscale_models":
+            continue
         dest = pathlib.Path(folders.get(m["folder"]) or pathlib.Path(models_dir or "") / m["folder"]) / name
-        if dest.exists() and dest.stat().st_size == m["size"]:
+        if already_have(comfy_url, m["folder"], name, m["size"], str(dest.parent)):
             yield {"step": f"model {name}", "status": "done", "detail": f"already in {dest.parent}"}
             continue
         yield from _download(stack.image_hf_url(name), dest, f"model {name}", m["size"], m["sha256"])

@@ -71,6 +71,11 @@ def set_languages(project_id: str, payload: dict):
         if "study_mode" in payload:
             st.study_mode = bool(payload["study_mode"])
         if film is not None:
+            # 原聲換掉的那個語言，之前是因為「跟原聲一樣」才被拿出字幕清單 → 換掉原聲就放回第一個
+            #   （範例 3：中文原聲換日文，中文沒回到字幕，要按四下才排回「中文第一」）
+            if (film != was_film and learners is None and was_film in LEARNER_LANGS
+                    and was_film not in st.learner_languages):
+                st.learner_languages = [was_film] + list(st.learner_languages)
             st.film_language = film
         if learners is not None:
             st.learner_languages = learners
@@ -213,7 +218,7 @@ def start_study_video(project_id: str, order: int, lang: str):
             work = Path(tempfile.mkdtemp(prefix="gl_study_"))
             try:
                 out = work / f"{src.stem}_study_{st.film_language}-{lang}.mp4"
-                study_subs.burn(src, items, st.film_language, lang, out)
+                study_subs.burn(src, items, st.film_language, lang, out, names=jobs.glossary(st))
                 uri = media_store.save(project_id, out.stem, out.read_bytes(), "video/mp4")
             finally:
                 shutil.rmtree(work, ignore_errors=True)

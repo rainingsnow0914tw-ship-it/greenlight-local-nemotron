@@ -19,7 +19,7 @@ import logging
 import re
 from typing import Any, Callable
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from ..services import genai_client, rates
 from . import gates
@@ -37,8 +37,12 @@ class _Line(BaseModel):
     # 用字串不用 Literal：模型偶爾回 "neutral" 之類，整份回覆就被當成格式壞掉丟掉（實測連兩次）。
     # 值合不合法交給 gates（擋下講給它聽），不要讓格式檢查吃掉一整版。
     speech_level: str = Field(description="one of: intimate, casual, polite, formal, honorific, narration")
-    ruby: str = Field(description="the rewritten line in the film language with readings: Japanese 漢字[よみ] (hiragana), "
-                                  "Chinese 字[pīnyīn] one character at a time. English/Korean: plain text.")
+    # 先寫純文字再加讀音（幕後第 1 集：模型一個字一個字標讀音時順手把字打錯 —— 選[え]らぶ、登録[と]録[ろく]、
+    #    仕[し]上[あげ]る —— 字典也認不出來是錯字；有了純文字版，程式比一下就知道哪裡被改了）
+    spoken: str = Field(default="", description="the rewritten line in the film language as plain text, no readings. Write this FIRST.")
+    ruby: str = Field(description="the SAME line as `spoken`, word for word, with readings added: Japanese 漢字[よみ] (hiragana), "
+                                  "Chinese 字[pīnyīn] one character at a time. English/Korean: plain text. "
+                                  "Removing the brackets must give back `spoken` exactly.")
     why: str = Field(description="ONE short sentence for the learner, in the explanation language: why this register / "
                                  "this wording, as a teacher would say it (who is speaking to whom, how close they are)")
     sub_zh: str | None = Field(default=None, description="Traditional Chinese (Taiwan) subtitle, if requested")
@@ -48,7 +52,8 @@ class _Line(BaseModel):
 
 
 class _Note(BaseModel):
-    line_id: str = Field(description="which line this note is about")
+    # 第三世試跑：輸入的台詞欄位叫 id，模型的筆記也跟著寫 id → 三次都被擋、整批 133 句全丟。兩個名字都收
+    line_id: str = Field(validation_alias=AliasChoices("line_id", "id"), description="which line this note is about")
     point: str = Field(description="the learning point as a short title, in the explanation language")
     explain: str = Field(description="2-3 sentences in the explanation language: why it is said this way here, "
                                      "and how it would change for a different listener (a stranger, a superior)")
@@ -72,6 +77,11 @@ How to decide each line:
    The closer they are, the more casual. Private talk between people who know each other uses natural spoken
    contractions{contractions}. Formal or honorific speech only where the speaker truly talks that way here:
    rank, ceremony, a stranger, or someone performing formality on purpose.
+   A line spoken TO THE VIEWERS (to the camera: greeting the audience, asking them to like, subscribe or comment,
+   "everyone") is a host talking to their own audience: friendly and casual like a YouTuber (〜てね, 〜よ, 〜しよう),
+   not です／ください customer-service politeness.
+   Technical words and slang get the word people really use in the film language, never a literal rendering of the
+   characters (Chinese 翻車 "a fail" → 失敗, not 事故; 提示詞 → プロンプト). Use the glossary when it gives one.
 2. Keep the author's meaning, not the surface words. If an "original" text is given next to the line, its meaning
    wins over the script line (the script may be a mistranslation).
 3. It must be speakable within the shot: stay at or under the given "max_units" (characters for Japanese, Chinese
@@ -178,6 +188,16 @@ def _call(prompt: str, system: str, schema=None, action: str = ACTION, temperatu
             reply = response.parsed or schema.model_validate_json(response.text)
             break
         except ValueError as exc:
+            # 學習筆記是附加的：只有筆記壞了就不要筆記，台詞照收（不為了三條筆記丟掉整批台詞）
+            if schema is _Reply and "notes." in str(exc) and "lines." not in str(exc):
+                try:
+                    data = json.loads(response.text)
+                    data["notes"] = []
+                    reply = schema.model_validate(data)
+                    logger.warning("line director: notes malformed, kept lines without notes")
+                    break
+                except (ValueError, TypeError):
+                    pass
             last_err = " / ".join(str(exc).splitlines()[:4])[:300]
             logger.warning("line director bad reply: %s | tail: %s", last_err, (response.text or "")[-300:])
             # Ultra 實測：第一次回一篇散文分析、第二次把輸入的台詞 JSON 原樣抄回來 → 要把「該交什麼欄位」講白
@@ -196,6 +216,26 @@ def _skeleton(schema) -> dict:
         return {"flags": [{k: f.description for k, f in _Flag.model_fields.items()}]}
     return {"lines": [{k: f.description for k, f in _Line.model_fields.items()}],
             "notes": [{k: f.description for k, f in _Note.model_fields.items()}]}
+
+
+def _rekey(chunk: list[dict], got: list[dict]) -> list[dict]:
+    """模型把句子錯位了（id 跟抄回來的原句對不上）→ 照原句把 id 改回它真正改寫的那一句。
+    ：審稿後重寫那一版 23 句全部錯位，導致審稿抓到的 5 個錯字一個都換不上去。
+    只在原句唯一、而且那個 id 沒被別句正確佔用時才改；對不上的留著，給 align 關卡擋。"""
+    by_src: dict[str, list[str]] = {}
+    for ln in chunk:
+        by_src.setdefault((ln.get("source") or "").strip(), []).append(ln["id"])
+    own = {ln["id"]: (ln.get("source") or "").strip() for ln in chunk}
+    right = {r.get("id") for r in got if own.get(r.get("id")) == (r.get("source") or "").strip()}
+    for r in got:
+        src = (r.get("source") or "").strip()
+        if own.get(r.get("id")) == src:
+            continue
+        ids = by_src.get(src, [])
+        if len(ids) == 1 and ids[0] not in right:
+            r["id"] = ids[0]
+            right.add(ids[0])
+    return got
 
 
 def _as_dict(r: _Line) -> dict:
@@ -244,7 +284,7 @@ def direct(lines: list[dict], context: str, film: str, learners: list[str],
             for k in ("cost_usd", "input_tokens", "output_tokens"):
                 total[k] += usage[k]
             total["model"] = usage["model"] or total["model"]
-            got = [_as_dict(r) for r in reply.lines]
+            got = _rekey(chunk, [_as_dict(r) for r in reply.lines])
             if film == "ja":   # 漏標的讀音字典補（模型三版都補不齊的實測），補了哪些記下來給人看
                 for r in got:
                     r["ruby"], r["filled"] = gates.fill_ruby(gates.ja_punct(r.get("ruby", "")))
@@ -289,7 +329,7 @@ def direct(lines: list[dict], context: str, film: str, learners: list[str],
                                 f"right in this sentence." for d in doubts))
             reply, usage = _call(prompt, system)
             total["cost_usd"] += usage["cost_usd"]
-            got = [_as_dict(r) for r in reply.lines]
+            got = _rekey(chunk, [_as_dict(r) for r in reply.lines])
             if film == "ja":
                 for r in got:
                     r["ruby"], r["filled"] = gates.fill_ruby(gates.ja_punct(r.get("ruby", "")))
@@ -325,6 +365,24 @@ def direct(lines: list[dict], context: str, film: str, learners: list[str],
             if not src:
                 continue
             ruby = r.get("ruby", "")
+            plain = gates.ja_punct((r.get("spoken") or "").strip()) if film == "ja" else ""
+            # 讀音的錯到最後還在（標在假名上、兩個詞併一起標、吃掉送假名）也走同一條：範例 3 L23「登録忘[わす]れずに」
+            #   關卡抓到了、模型改了三輪沒改好，就這樣交出去
+            bad_reading = film == "ja" and any(i["id"] == r["id"] and i["level"] == "ERROR"
+                                               and i["rule"] in ("ruby", "okurigana") for i in issues)
+            if film == "ja" and bad_reading and not plain:
+                plain = gates.ja_punct(gates.strip_ruby(ruby).strip())
+            if plain and (gates.strip_ruby(ruby).strip() != plain or bad_reading):
+                # 改了幾輪讀音版還是把字改掉 → 信純文字版，讀音整句用字典重標（字典讀音錯的少、錯字錯得多）
+                ruby, refilled = gates.fill_ruby(plain)
+                # 這一句的問題照換過的版本重查一次（舊的「把字改掉了」「讀音可能錯」講的是丟掉的那版，留著會讓人以為沒修好）
+                fixed = {**r, "ruby": ruby, "filled": refilled}
+                #    只重查跟讀音有關的（秒數那類是整鏡加總算的，單句重查會算錯）
+                about = {"ruby_copy", "ruby", "reading", "okurigana"}
+                issues = [i for i in issues if not (i["id"] == r["id"] and i["rule"] in about)] + [
+                    i for i in gates.check([src], [fixed], film, learners, people, en_names, name_say)
+                    if i["id"] == r["id"] and i["rule"] in about]
+                r = fixed
             spoken = gates.strip_ruby(ruby)
             results[r["id"]] = {
                 **{k: src.get(k) for k in ("id", "shot_id", "k", "speaker", "voice_role", "seconds", "source", "original")},

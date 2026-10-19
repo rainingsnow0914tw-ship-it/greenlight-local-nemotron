@@ -8,8 +8,10 @@
  * 使用者可以自己改任何一句（改完重跑關卡、寫回分鏡表，H3 唸的就是改過的）。
  */
 import { useEffect, useRef, useState } from 'react'
+import { makePollGate } from '../pollGate'
 import { send, type Lang } from '../api'
 import { LANG_NAME } from './LanguagePanel'
+import { AiText } from './AiText'
 
 type Line = {
   id: string; shot_id: string; speaker: string; source: string; ruby: string; spoken: string; register: string
@@ -31,11 +33,14 @@ const REG: Record<Lang, Record<string, string>> = {
 }
 const RULE: Record<Lang, Record<string, string>> = {
   zh: { ruby: '讀音沒標齊', kougo: '私下講話卻是書面語', length: '這一鏡唸不完', subs: '字幕缺或照抄', target: '還沒改成原聲語言', ids: '漏句或多句', tongue: '可能唸糊', short: '太短會唸成亂音',
-        align: '對錯句（併句或錯位）', names: '名字被翻掉', persona: '人稱不合角色（女生說俺）', foreign: '混了外文單字', register: '語氣標籤不合法', reading: '讀音可能錯（字典對照）', explain: '解說沒用學習者的語言寫' },
+        align: '對錯句（併句或錯位）', names: '名字被翻掉', persona: '人稱不合角色（女生說俺）', foreign: '混了外文單字', register: '語氣標籤不合法', reading: '讀音可能錯（字典對照）', explain: '解說沒用學習者的語言寫',
+        ruby_copy: '加讀音時把字改掉了', okurigana: '讀音吃掉了送假名', untranslated: '夾了沒翻的中文', grammar: '動詞活用接錯', terms: '術語沒照名字表' },
   en: { ruby: 'missing readings', kougo: 'written, not spoken, Japanese', length: 'too long for the shot', subs: 'subtitle missing or copied', target: 'not in the spoken language yet', ids: 'missing or extra lines', tongue: 'hard to pronounce', short: 'too short (gets garbled)',
-        align: 'answered the wrong line (merged or shifted)', names: 'a name got translated', persona: 'voice does not fit the character', foreign: 'stray foreign words', register: 'invalid register', reading: 'reading may be wrong (dictionary)', explain: 'explanation not in the learner\'s language' },
+        align: 'answered the wrong line (merged or shifted)', names: 'a name got translated', persona: 'voice does not fit the character', foreign: 'stray foreign words', register: 'invalid register', reading: 'reading may be wrong (dictionary)', explain: 'explanation not in the learner\'s language',
+        ruby_copy: 'adding readings changed the words', okurigana: 'reading swallowed the okurigana', untranslated: 'untranslated Chinese left in', grammar: 'verb form does not conjugate', terms: 'term not as in the glossary' },
   ja: { ruby: 'ふりがな不足', kougo: '会話なのに書き言葉', length: 'カット内に言い切れない', subs: '字幕の欠落・コピー', target: 'まだ話す言語になっていない', ids: 'セリフの欠落・重複', tongue: '言いにくい', short: '短すぎて崩れる',
-        align: '別の行に答えた（結合・ずれ）', names: '名前が訳された', persona: '人称がキャラに合わない', foreign: '外国語の混入', register: '口調ラベルが不正', reading: '読みの誤りの可能性（辞書）', explain: '解説が学習者の言語でない' },
+        align: '別の行に答えた（結合・ずれ）', names: '名前が訳された', persona: '人称がキャラに合わない', foreign: '外国語の混入', register: '口調ラベルが不正', reading: '読みの誤りの可能性（辞書）', explain: '解説が学習者の言語でない',
+        ruby_copy: 'ふりがなを付けたら字が変わった', okurigana: '読みが送り仮名を含んでいる', untranslated: '訳していない中国語が残っている', grammar: '活用の誤り', terms: '用語が名前リストと違う' },
 }
 
 const T = {
@@ -107,6 +112,7 @@ function Ruby({ text }: { text: string }) {
 export function LinesPanel({ lang, projectId, order }: { lang: Lang; projectId: string; order: number }) {
   const t = T[lang]
   const [st, setSt] = useState<State | null>(null)
+  const statusRef = useRef<string | null>(null)   // 最近一次的狀態：沒在跑就放慢輪詢（pollGate）
   const [err, setErr] = useState('')
   const [now, setNow] = useState(Date.now())
   const [pick, setPick] = useState(0)
@@ -117,11 +123,12 @@ export function LinesPanel({ lang, projectId, order }: { lang: Lang; projectId: 
 
   const poll = async () => {
     const r = await fetch(`/api/projects/${projectId}/segments/${order}/lines`)
-    if (r.ok) setSt(await r.json())
+    if (r.ok) { const s = await r.json(); statusRef.current = s.status; setSt(s) }
   }
   useEffect(() => {
     void poll()
-    const id = setInterval(() => { if (!busy.current) void poll(); setNow(Date.now()) }, 3000)
+    const gate = makePollGate()
+    const id = setInterval(() => { if (!busy.current && gate(statusRef.current)) void poll(); setNow(Date.now()) }, 3000)
     return () => clearInterval(id)
   }, [projectId, order])
   useEffect(() => {
@@ -200,7 +207,7 @@ export function LinesPanel({ lang, projectId, order }: { lang: Lang; projectId: 
                 <span className="direction-at">{startedAt ? `${Math.round(e.t - startedAt)}${t.sec}` : ''}</span>
                 {e.failed ? t.reviewFailed : t.review(flags.length)}
                 {(e.dropped as number) > 0 && <span className="direction-warn"> · {t.dropped(e.dropped as number)}</span>}
-                {flags.map((f, j) => <div key={j} className="direction-sub">{f.id}：「{f.quote}」— {f.problem}</div>)}
+                {flags.map((f, j) => <div key={j} className="direction-sub">{f.id}：「{f.quote}」— <AiText text={f.problem} lang={lang} projectId={projectId} /></div>)}
               </li>
             }
             const top = (e.top as { rule: string; count: number }[]) ?? []

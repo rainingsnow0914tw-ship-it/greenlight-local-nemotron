@@ -11,6 +11,7 @@
 """
 
 import json
+import logging
 import os
 import pathlib
 import re
@@ -21,6 +22,8 @@ import httpx
 
 from . import gates
 
+logger = logging.getLogger(__name__)
+
 ROOT = pathlib.Path(__file__).parent
 TOKEN_FACTORY_BASE = os.environ.get("TOKEN_FACTORY_BASE", "https://api.tokenfactory.nebius.com/v1")
 MAX_ROUNDS = int(os.environ.get("DIRECTOR_MAX_ROUNDS", "10"))   # 穩定測試第三輪：沒過的那場 32→6→5→4→3→1 一路在收斂、只是回合用完
@@ -30,6 +33,9 @@ REASONING_BUDGET = int(os.environ.get("REASONING_BUDGET", "12000"))
 CRITIC_ROUNDS = int(os.environ.get("CRITIC_ROUNDS", "2"))
 # 每次評審之後另外給幾回合改（改完要重新過關卡）
 REVISION_ROUNDS = int(os.environ.get("REVISION_ROUNDS", "4"))
+# 錯誤連續幾回合沒創新低就停、交錯最少那版（第三世：每段錯誤卡在 2～4 個還跑滿 10 回合，一段 12 分鐘白跑一半）。
+#    只要還在創新低就繼續跑（那場 32→6→5→4→3→1 是一路收斂、不能停）。剩下的錯誤由生成前關卡擋下來給人看。
+PATIENCE = int(os.environ.get("DIRECTOR_PATIENCE", "3"))
 
 SHOT_SCHEMA = """Return ONLY a JSON object, no prose, in exactly this shape:
 {"shots": [
@@ -285,6 +291,134 @@ def direct(scene: dict, call=None, model: str = None) -> dict:
             return event
 
 
+FIX_TRIES = 3
+
+
+def _strip_sound_clauses(shots: list, shot_id: str) -> list | None:
+    """把這一鏡表演句裡含會出聲的字（gates.SOUND_WORDS／SPEAK_WORDS）的那一段刪掉；刪完沒東西剩就回 None（交給模型）。
+    一段＝用「，」「；」切開的一小句；「之後／然後／最後」這類接詞跟著留在前面。"""
+    import copy
+    out = copy.deepcopy(shots)
+    s = next((x for x in out if x.get("shot_id") == shot_id), None)
+    if not s or not s.get("visual_prompt"):
+        return None
+    bad = re.compile(gates.SOUND_WORDS + "|" + gates.SPEAK_WORDS)
+    parts = [p for p in re.split(r"(?<=[，；,;])", s["visual_prompt"]) if p]
+    keep = [p for p in parts if not bad.search(p)]
+    if not keep or len(keep) == len(parts):
+        return None
+    s["visual_prompt"] = re.sub(r"[，；,;]\s*$", "。", "".join(keep).strip())
+    # 英文版刪掉講嘴、出聲的那一段（給人看的翻譯，跟中文一起改，不然兩版對不上）
+    if s.get("visual_prompt_en"):
+        en_bad = re.compile(r"\b(mouth|lips?|bites?|breath\w*|sigh\w*|laugh\w*|smil\w*|giggl\w*|speak\w*|talk\w*|says?)\b", re.I)
+        en_parts = [p for p in re.split(r"(?<=,)", s["visual_prompt_en"]) if p]
+        en_keep = [p for p in en_parts if not en_bad.search(p)]
+        if en_keep and len(en_keep) < len(en_parts):
+            s["visual_prompt_en"] = re.sub(r",\s*$", ".", "".join(en_keep).strip())
+    return out
+
+
+def fix_shot(scene: dict, shots: list, shot_id: str, call=None, model: str = None) -> dict:
+    """只修被生成前關卡擋下的那一鏡：整場目前這一版＋這一鏡的錯 → 改稿（只交改動的鏡）→ 重跑關卡。
+
+    為什麼要有：第三世試跑，前 20 鏡有 5 鏡被生成前關卡擋（短句、不到 5 秒、動作沒起點終點），
+    畫面叫使用者「先改分鏡再生」，app 卻沒有任何地方能改一鏡 —— 唯一的路是整段重導（71 分鐘）。
+    跟導演迴圈同一套：改稿用 apply_patch（沒交的鏡碰不到），整場錯誤變多就不收。
+    可以動前後鄰鏡（短句要併進前一鏡或後一鏡，字不改），併掉的鏡放 remove。
+    回傳 {status: fixed/partial/failed, shots, changed, removed, errors_before, errors_after, tries}。
+    """
+    if not model:
+        from ..services import settings_store
+        model = settings_store.load()["roles"]["director"]["model"]
+    if call is None:
+        call = (lambda msgs: agent_turn(msgs, model, scene)[:2]) if USE_TOOLS else (lambda msgs: call_token_factory(msgs, model))
+    mine = lambda iss: [i for i in iss if i["level"] == "ERROR" and i["shot"] == shot_id]  # noqa: E731
+    issues = gates.check(scene, shots)
+    total0, target0 = sum(i["level"] == "ERROR" for i in issues), mine(issues)
+    if not target0:
+        return {"status": "fixed", "shots": shots, "changed": [], "removed": [], "errors_before": 0, "errors_after": 0, "tries": 0}
+    # 只有「表演句寫了會出聲的字」→ 程式直接把那一小段刪掉，不叫模型（範例 3 s002_11「把右手放在嘴邊」：
+    #    請 Nemotron 修三次，三次都順手改了鄰鏡的台詞、整場變糟被退 —— 刪一個子句的事，不該交給會亂動的模型）
+    if all(i["rule"] == "rule 3" for i in target0):
+        fixed = _strip_sound_clauses(shots, shot_id)
+        if fixed is not None:
+            after = gates.check(scene, fixed)
+            if not mine(after) and sum(i["level"] == "ERROR" for i in after) <= total0:
+                return {"status": "fixed", "shots": fixed, "changed": [shot_id], "removed": [], "errors_before": total0,
+                        "errors_after": sum(i["level"] == "ERROR" for i in after), "tries": 0}
+    base = [
+        {"role": "system", "content": system_prompt(scene.get("scene_id", ""))},
+        {"role": "user", "content": _part_first(scene) + "Direct this scene:\n" + json.dumps(scene, ensure_ascii=False, indent=1) + "\n\n" + duration_table(scene)},
+        {"role": "assistant", "content": json.dumps({"shots": shots}, ensure_ascii=False)},
+    ]
+    note = (f"Shot {shot_id} is blocked by the pre-render gate:\n" + gates.summarize(target0) +
+            f"\n\nFix ONLY {shot_id}. You may also change the shot right before or after it when the fix needs it "
+            "(e.g. a line too short to stand alone goes into the neighbouring shot together with that shot's line — "
+            "keep every word of both lines). If you merge it away, list it in \"remove\". "
+            'Return {"changes": [only the shots you changed, complete], "remove": [shot ids]} and nothing else.')
+    best, tries = None, 0
+    for tries in range(1, FIX_TRIES + 1):
+        try:
+            reply, _ = call(base + [{"role": "user", "content": note}])
+            data = parse_json(reply)
+            if "changes" not in data and isinstance(data.get("shots"), list):
+                data = {"changes": data["shots"]}
+            # 鏡號寫法不一（s003_019 ⇄ s003_19）：實測模型會補零，對不上就變成新增一鏡、原鏡還在 → 格式的事程式改
+            fix_id = lambda x: re.sub(r"^(s\d{3})_0*(\d{2,})", lambda m: f"{m.group(1)}_{int(m.group(2)):02d}", str(x or ""))  # noqa: E731
+            for c in data.get("changes") or []:
+                if isinstance(c, dict) and c.get("shot_id"):
+                    c["shot_id"] = fix_id(c["shot_id"])
+            data["remove"] = [fix_id(x) for x in data.get("remove") or []]
+            # 併鏡卻忘了寫 remove（實測：「にゃあ」併進前一鏡、原鏡還在 → 同一句講兩次、整場變糟被退）：
+            #    改過的鏡已經包含這一鏡的每一句 → 程式替它刪掉原鏡
+            said = lambda s: [d.get("text", "") for d in s.get("dialogue_lines") or []] or ([s["dialogue"]] if s.get("dialogue") else [])  # noqa: E731
+            mine_lines = said(next(s for s in shots if s.get("shot_id") == shot_id))
+            if mine_lines and shot_id not in {c.get("shot_id") for c in data.get("changes") or []} and any(
+                    all(t in said(c) for t in mine_lines) for c in data.get("changes") or [] if isinstance(c, dict)):
+                data["remove"] = list({*(data.get("remove") or []), shot_id})
+            for c in data.get("changes") or []:     # 併鏡時 dialogue 常留空：照規則 6 由程式接起來（格式的事不叫模型做）
+                if isinstance(c, dict) and c.get("dialogue_lines") and not c.get("dialogue"):
+                    c["dialogue"] = "".join(d.get("text", "") for d in c["dialogue_lines"])
+            new = apply_patch(shots, data)
+        except (ValueError, json.JSONDecodeError) as e:
+            note = note.split("\n\nYour last reply")[0] + f"\n\nYour last reply could not be used: {e}. Return only the JSON object."
+            continue
+        iss = gates.check(scene, new)
+        total, target = sum(i["level"] == "ERROR" for i in iss), mine(iss)
+        removed = shot_id in {s.get("shot_id") for s in shots} - {s.get("shot_id") for s in new}
+        # 收不收看「有沒有改出新錯」，不是看總數：實測，刪掉被擋的鏡（-1）、鄰鏡多一個錯（+1），
+        #    總數持平就被收下 —— 其實只是把擋下的地方往前移一鏡
+        #    比對時拿掉數字與括號（「重複 4 鏡 (s002_04, …)」刪一鏡就變成 3 鏡，不是新錯）
+        key = lambda i: (i["shot"], i["rule"], re.sub(r"\(.*?\)|\d+", "", i["msg"]))  # noqa: E731
+        had = {key(i) for i in issues}
+        fresh = [i for i in iss if i["level"] == "ERROR" and key(i) not in had]
+        logger.warning("fix_shot %s try %d: changed=%s removed=%s target_left=%d new_errors=%s", shot_id, tries,
+                    [c.get("shot_id") for c in data.get("changes") or []], data.get("remove"), len(target),
+                    [(i["shot"], i["rule"], i["msg"][:80]) for i in fresh][:5])
+        if not fresh and (removed or len(target) < len(target0)):
+            best = (new, data, total, target)
+            if not target or removed:
+                break
+        # 只講「這次改出來的新錯」：整場原本就有的錯一起列，模型分不出哪個是它造成的
+        note = note.split("\n\nYour last reply")[0] + ("\n\nYour last reply did not fix it" + (
+            f" and made the scene worse ({total0} → {total} errors)" if total > total0 else "") + ". " +
+            ("It introduced:\n" + gates.summarize(fresh[:8]) if fresh else "Still blocked:\n" + gates.summarize(target[:8])))
+    if not best:
+        return {"status": "failed", "shots": shots, "changed": [], "removed": [], "errors_before": len(target0),
+                "errors_after": len(target0), "tries": tries}
+    new, data, total, target = best
+    return {"status": "partial" if target else "fixed", "shots": new,
+            "changed": [s["shot_id"] for s in data.get("changes") or []], "removed": list(data.get("remove") or []),
+            "errors_before": len(target0), "errors_after": len(target), "tries": tries}
+
+
+def _part_first(scene: dict) -> str:
+    """長場次切段導的那一句（services/direction.split_scene 的 part_note）放在最前面：埋在 JSON 裡會被當成普通欄位，
+    範例 3 第 2 場第 2 段照樣當成一場的開頭，補了兩鏡「月音揮手歡迎 Lisa 走進來」。"""
+    note = scene.get("part_note")
+    return f"⚠ {note} Do not add an opening or introduction beat unless this is the opening part.\n\n" if note else ""
+
+
 def direct_iter(scene: dict, call=None, model: str = None, record: bool = True):
     """導演迴圈（_direct_iter）外面包一層：每一場結束，不管哪一個出口，都寫進學習記憶庫。
 
@@ -337,10 +471,11 @@ def _direct_iter(scene: dict, call=None, model: str = None):
         brief = ""
     base = [
         {"role": "system", "content": system_prompt(scene.get("scene_id", ""))},
-        {"role": "user", "content": "Direct this scene:\n" + json.dumps(scene, ensure_ascii=False, indent=1)
+        {"role": "user", "content": _part_first(scene) + "Direct this scene:\n" + json.dumps(scene, ensure_ascii=False, indent=1)
                                     + "\n\n" + duration_table(scene) + ("\n\n" + brief if brief else "")},
     ]
     trace, shots, critiques, best, current = [], [], 0, None, None
+    low, stall = 10**9, 0                                    # 目前最少的錯誤數、幾回合沒創新低
     cur_errors, cur_feedback, fresh_phase = 10**9, "", True   # 目前這一版的錯誤數；評審後的第一回合 fresh_phase=True
     last_reply, note = None, None
     # 回合預算分階段：第一次過關卡最多 MAX_ROUNDS 回合；每次評審之後，另外給 REVISION_ROUNDS 回合改。
@@ -384,7 +519,8 @@ def _direct_iter(scene: dict, call=None, model: str = None):
             # 改壞了就不收：修關卡的階段，錯誤變多的那一版不當下一回合的底，退回錯最少的那一版。
             # 雲端實測：錯誤一路 13→11→13、5→3→3→… 來回跳，因為改壞的版本照樣被拿來當下一回合的底。
             # 評審意見後的第一回合例外（本來就要照意見大改），它改完就是新的底。
-            if current and not fresh_phase and errs > cur_errors:
+            #    空的分鏡也不收（第三世：最後一回合回了 0 鏡、9 個「台詞漏掉」，錯誤數比上一版少就被當成更好的版本）
+            if current and ((not fresh_phase and errs > cur_errors) or not shots):
                 step["rejected"] = True
                 feedback = (f"Your revision made it worse ({cur_errors} → {errs} errors) and was NOT applied; the shot list "
                             "below is still the previous version. Undo what broke and fix only these remaining errors:\n"
@@ -398,6 +534,10 @@ def _direct_iter(scene: dict, call=None, model: str = None):
             step.update(shots=0, errors=1, warnings=0, issues=[{"shot": "reply", "level": "ERROR", "rule": "format", "msg": str(e)}])
         trace.append(step)
         yield {"type": "round", **step, "shots_detail": shots}
+        if step["errors"] and step.get("shots"):
+            low, stall = (step["errors"], 0) if step["errors"] < low else (low, stall + 1)
+            if stall >= PATIENCE:
+                break
         if step["errors"] == 0:
             best = (rnd, shots)          # 最後一版「關卡全過」的分鏡：評審是加分，不能因為改壞了反而什麼都沒有
             # 關卡全過 → 交給評審（Ultra）。評審點頭、或評審次數用完，才算完成。
@@ -449,7 +589,8 @@ def _direct_iter(scene: dict, call=None, model: str = None):
         yield {"type": "done", "status": "passed", "rounds": best[0], "shots": best[1], "trace": trace,
                "note": "revisions after the producer's notes did not pass the gates in time; keeping the last version that did"}
         return
-    yield {"type": "done", "status": "gave_up", "rounds": rnd, "shots": shots, "trace": trace}
+    # 回合用完沒過關卡：交錯誤最少的那一版（current），不是最後一回合 —— 最後一回合可能剛好是空的
+    yield {"type": "done", "status": "gave_up", "rounds": rnd, "shots": current or shots, "trace": trace}
 
 
 if __name__ == "__main__":

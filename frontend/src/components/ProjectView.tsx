@@ -10,7 +10,7 @@
 
 import { Icon } from './Icons'
 import { AiText } from './AiText'
-import { SEGMENT_STATUS } from '../sysText'
+import { SEGMENT_STATUS, nameText } from '../sysText'
 import { useCallback, useEffect, useState } from 'react'
 import {
   api,
@@ -25,7 +25,6 @@ import { STAGE_DESCRIPTIONS, STAGE_ORDER, type Copy } from '../i18n'
 import { RewindPanel } from './RewindPanel'
 import { FilmPanel } from './FilmPanel'
 import { LearningPanel } from './LearningPanel'
-import { ScreeningPanel } from './ScreeningPanel'
 import { LookPanel } from './LookPanel'
 import { LanguagePanel } from './LanguagePanel'
 
@@ -61,6 +60,7 @@ export function ProjectView({
   const [segments, setSegments] = useState<SegmentsResponse | null>(null)
   const [openScene, setOpenScene] = useState<number | null>(null)
   const [sourceText, setSourceText] = useState<string>('')
+  const [parsing, setParsing] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -117,8 +117,32 @@ export function ProjectView({
       </p>
       <h1 className="with-icon">
         <Icon name="script" size={80} className="title-icon" />
-        {detail.progress.title}
+        {detail.progress.sample_info?.title?.[lang] ?? nameText(detail.progress.title, lang)}
       </h1>
+      {/* 內建範例：這一例示範什麼（三語分開寫，不機翻） */}
+      {detail.progress.sample_info?.note?.[lang] && (
+        <div className="notice">{detail.progress.sample_info.note[lang]}</div>
+      )}
+
+      {/* 上傳完沒馬上解析（回首頁、關掉 app）再打開 → 這裡要有路往下走（試跑：以前只有上傳那一刻看得到解析按鈕，之後就卡死） */}
+      {detail.progress.stage === 'script_uploaded' && (
+        <div className="actions">
+          <button className="btn primary" disabled={parsing} onClick={async () => {
+            setParsing(true)
+            onError('')
+            try {
+              const res = await fetch(`/api/projects/${projectId}/parse`, { method: 'POST' })
+              const body = await res.json()
+              if (!res.ok) throw new Error(body.detail || `HTTP ${res.status}`)
+              await load()
+            } catch (e) {
+              onError(e instanceof Error ? e.message : String(e))
+            }
+            setParsing(false)
+          }}>{parsing ? copy.parseWaiting : copy.parseButton}</button>
+          <span className="section-note">{copy.parseCostNote}</span>
+        </div>
+      )}
 
       <div className="stats">
         {sp && (
@@ -181,14 +205,6 @@ export function ProjectView({
         </section>
       )}
 
-      {/* 內容預審 —— 位置就是重點。
-          原本擺在 11 章的段落清單後面，等於要滾過整份分段表才看得到，
-          那時候使用者已經準備開拍了。丟劇本之後就要審查 ——
-          這一關的價值全在「早」，
-          擺晚了就退化成事後報告。
-          解析疑慮的正下方：兩者都是「這份劇本有什麼要注意的」。
-          只給資訊不擋流程（「改不改的話無所謂」）。 */}
-      <ScreeningPanel lang={lang} projectId={projectId} />
 
       {/* 定調 —— 必須排在角色表之前。
           沒定風格就沒法選角色（真人還是動漫風）：
@@ -282,7 +298,7 @@ export function ProjectView({
           <div className="section-head">
             <h2>
           <Icon name="segments" size={80} className="section-icon" />
-          {plan.label}
+          {nameText(plan.label, lang)}
         </h2>
             <span className="section-note">
               {(plan.total_seconds / 60).toFixed(0)}
@@ -308,7 +324,7 @@ export function ProjectView({
               >
                 <div className="segment-no">{s.order}</div>
                 <div>
-                  <p className="segment-title">{s.title}</p>
+                  <p className="segment-title">{nameText(s.title, lang)}</p>
                   <p className="segment-synopsis"><AiText text={s.synopsis} lang={lang} projectId={projectId} /></p>
                   <span className={`badge ${s.status === 'done' ? 'done' : 'not-started'}`}>
                     {SEGMENT_STATUS[s.status]?.[lang] ?? s.status_label}

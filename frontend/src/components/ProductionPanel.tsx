@@ -26,6 +26,8 @@
 import { Icon } from './Icons'
 import { sysText } from '../sysText'
 import { VerifyBlock } from './VerifyBlock'
+import { AiText } from './AiText'
+import { PREFLIGHT_RE } from './FixShotButton'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   videoApi,
@@ -174,22 +176,33 @@ export function ProductionPanel({
     setBusy('auto')
 
     const total = batch.total
-    let current = batch.approved + batch.awaiting
+    let now = batch
+    // 生成前關卡擋下的鏡先跳過、其他照生，最後再列出來（範例 3：一鍵生成卡在第 11 鏡，
+    //    使用者睡一覺起來後面 12 鏡一鏡都沒動）。擋下的第一鏡的錯誤留在畫面上，「讓 Nemotron 修這一鏡」才會出現。
+    const skipped: { shot: string; msg: string }[] = []
 
     try {
-      while (current < total) {
+      for (;;) {
         if (cancelAuto.current) {
           setAutoStopped(true)
           break
         }
-        setAutoProgress({ n: current + 1, total })
-        const next = await videoApi.nextClip(projectId, order, true)
-        setBatch(next)
-        const generated = next.clips.filter((c) => c.status !== 'not_started').length
-        // 用後端回報的真實數字推進，不要自己 +1 ——
-        // 重拍或失敗會讓前端的計數跟真實狀態對不上。
-        if (generated <= current) break
-        current = generated
+        const todo = now.clips.filter((c) => c.status === 'not_started' && !skipped.some((s) => s.shot === c.shot_id))
+        if (!todo.length) break
+        const done = now.clips.filter((c) => c.status !== 'not_started').length
+        setAutoProgress({ n: done + skipped.length + 1, total })
+        try {
+          now = await videoApi.nextClip(projectId, order, true, todo[0].shot_id)
+          setBatch(now)
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          if (!PREFLIGHT_RE.test(msg)) throw e
+          skipped.push({ shot: todo[0].shot_id, msg })
+        }
+      }
+      if (skipped.length) {
+        onError(skipped[0].msg + (skipped.length > 1
+          ? `\n（另外也沒過生成前關卡、先跳過：${skipped.slice(1).map((s) => s.shot).join('、')}）` : ''))
       }
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e))
@@ -347,7 +360,7 @@ export function ProductionPanel({
               <span className="price">${batch.next_shot.cost_usd}</span>
             </button>
             <span className="prompt-preview">
-              {batch.next_shot.shot_id} · {batch.next_shot.description}
+              {batch.next_shot.shot_id} · <AiText text={batch.next_shot.description} lang={lang} projectId={projectId} />
             </span>
           </div>
         )}
@@ -433,6 +446,7 @@ export function ProductionPanel({
               <ClipCard
                 key={clip.shot_id}
                 copy={copy}
+                lang={lang}
                 clip={clip}
                 busy={busy}
                 verifyBlock={<VerifyBlock lang={lang} projectId={projectId} order={order} shotId={clip.shot_id}
@@ -606,6 +620,7 @@ function humanError(err: string, copy: Copy): string {
 
 function ClipCard({
   copy,
+  lang,
   clip,
   busy,
   onApprove,
@@ -615,6 +630,7 @@ function ClipCard({
   verifyBlock,
 }: {
   copy: Copy
+  lang: Lang
   clip: ClipRecord
   busy: string | null
   verifyBlock?: React.ReactNode
@@ -679,7 +695,7 @@ function ClipCard({
 
       {clip.warnings.filter((w) => !(clip.verify && w.includes('查證：'))).map((w, i) => (
         <div className="notice warn" key={i}>
-          {w}
+          {sysText(w, lang)}
         </div>
       ))}
 

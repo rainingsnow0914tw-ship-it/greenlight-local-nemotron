@@ -23,7 +23,7 @@ const T = {
     why: '台詞不是機翻：Nemotron 台詞導演看誰在跟誰講話、熟不熟、地位高低，寫出這個角色此刻真的會講的話（越熟越口語），再寫出帶著同樣語氣的字幕和「為什麼這樣說」。',
     film: '原聲語言（角色講什麼）', learners: '字幕下行（母語，可多選，一種燒一版）',
     first: '第一個也是學習筆記的解說語言。', saved: '已儲存',
-    names: '名字表（一行一個：名字=原聲怎麼唸/英文字幕怎麼寫）', namesHelp: '名字要跟你作品既有的譯名一致；只被提到、不出現在畫面上的角色（AI、寵物）程式抓不到，要寫在這裡，不然名字會被當成普通的詞翻掉。英文可省略。',
+    names: '名字表（一行一個：名字=原聲怎麼唸/英文字幕怎麼寫/個性）', namesHelp: '名字要跟你作品既有的譯名一致；只被提到、不出現在畫面上的角色（AI、寵物）程式抓不到，要寫在這裡，不然名字會被當成普通的詞翻掉。英文可省略。最後一欄寫個性和自稱（例：溫柔的男生，自稱僕）—— 台詞導演會照著寫，用錯自稱會被擋下來重寫；術語（不是人）也可以列在這裡，原聲就一律用你寫的說法。',
     namesSave: '儲存名字表',
   },
   en: {
@@ -32,7 +32,7 @@ const T = {
     why: 'Not machine translation: the Nemotron line director looks at who is talking to whom, how close they are and who outranks whom, writes what this character would really say right now (closer means more casual), then a subtitle with the same tone and a note on why it is said that way.',
     film: 'Spoken language (what the characters speak)', learners: 'Subtitle language (yours — pick one or more, one version each)',
     first: 'The first one is also the language of the study notes.', saved: 'Saved',
-    names: 'Names (one per line: name=how it is said/how English subtitles spell it)', namesHelp: 'Keep names consistent with your existing translations. Characters who are only mentioned and never on screen (an AI, a pet) cannot be detected — list them here, or their names get translated as ordinary words. The English part is optional.',
+    names: 'Names (one per line: name=how it is said/how English subtitles spell it/personality)', namesHelp: 'Keep names consistent with your existing translations. Characters who are only mentioned and never on screen (an AI, a pet) cannot be detected — list them here, or their names get translated as ordinary words. The English part is optional. The last field is personality and how they refer to themselves (e.g. gentle boy, calls himself 僕) — the line director follows it, and a line with the wrong pronoun is sent back. Terms (not people) can go here too, so the voice always uses your wording.',
     namesSave: 'Save names',
   },
   ja: {
@@ -41,7 +41,7 @@ const T = {
     why: '機械翻訳ではありません。Nemotron のセリフ演出が、誰が誰に話しているか、どれくらい親しいか、立場の上下を見て、このキャラクターが今本当に言う言葉を書きます（親しいほど口語に）。同じ口調の字幕と「なぜこう言うのか」も付けます。',
     film: '話す言語（キャラクターのセリフ）', learners: '字幕の下段（あなたの言語・複数可、言語ごとに一本）',
     first: '最初の言語が学習ノートの解説言語になります。', saved: '保存しました',
-    names: '名前リスト（1行に1つ：名前=読み方/英語字幕の表記）', namesHelp: '既存の訳名とそろえてください。話に出てくるだけで画面に出ない人物（AI・ペット）は検出できません。ここに書かないと、名前が普通の言葉として訳されてしまいます。英語は省略可。',
+    names: '名前リスト（1行に1つ：名前=読み方/英語字幕の表記/性格）', namesHelp: '既存の訳名とそろえてください。話に出てくるだけで画面に出ない人物（AI・ペット）は検出できません。ここに書かないと、名前が普通の言葉として訳されてしまいます。英語は省略可。最後の欄には性格と一人称（例：やさしい男の子、一人称は僕）を書くと、台詞ディレクターがそれに合わせ、一人称がずれた台詞は書き直しになります。人物でない用語も書けば、音声ではいつもその言い方になります。',
     namesSave: '名前リストを保存',
   },
 }
@@ -113,7 +113,7 @@ export function LanguagePanel({ lang, projectId, onChanged }: { lang: Lang; proj
           <div className="lang-row">
             <div className="stat-label">{t.names}</div>
             <textarea className="lang-names" rows={3} value={names ?? st.name_glossary}
-              placeholder={'深息=シェンシー/Shenxi\n月音=つきね/Tsukine\nLisa=リサ'} onChange={(e) => setNames(e.target.value)} />
+              placeholder={'深息=シェンシー/Shenxi/溫柔的男生，自稱僕\n月音=つきね/Tsukine/自稱私\n提示詞=プロンプト/prompt'} onChange={(e) => setNames(e.target.value)} />
             <div className="section-note">{t.namesHelp}</div>
             {names !== null && names !== st.name_glossary && (
               <div><button className="btn primary small" onClick={() => void save({ name_glossary: names }).then(() => setNames(null))}>{t.namesSave}</button></div>

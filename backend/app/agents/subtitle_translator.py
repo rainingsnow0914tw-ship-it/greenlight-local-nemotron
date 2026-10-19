@@ -85,6 +85,7 @@ Return the same number of lines, keeping each index unchanged."""
 def translate_cues(
     texts: list[tuple[int, str]],
     target_lang: str,
+    glossary_text: str = "",
 ) -> tuple[dict[int, str], dict[str, Any]]:
     """翻譯一批字幕。回傳 ({編號: 譯文}, 用量)。
 
@@ -96,6 +97,26 @@ def translate_cues(
     if not texts:
         return {}, {"model": "", "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
 
+    # 名字表：沒有它，日文原聲的「つきね」會原樣留在中文字幕、英文拼成 Tsukune
+    #（範例專案實證）。提示詞先講，譯完再用名字表把漏網的換掉。
+    from ..services.ui_translate import fix_names, name_hints
+
+    system = _system(target_lang)
+    names = name_hints(glossary_text, target_lang)
+    if names and target_lang != "ja":
+        # 日文原聲的台詞裡名字寫成讀音，要讓譯者認得出那是誰
+        readings = []
+        for ln in glossary_text.splitlines():
+            if "=" in ln:
+                name, rest = (x.strip() for x in ln.split("=", 1))
+                reading = rest.partition("/")[0].strip()
+                if reading and reading != name:
+                    readings.append(f"{reading} = {name}")
+        if readings:
+            names += "\n" + "\n".join(readings)
+    if names:
+        system += f"\n\nCharacter names — write them exactly like this:\n{names}"
+
     client = _client()
     model = _model()
     body = "\n".join(f"[{i}] {t}" for i, t in texts)
@@ -106,7 +127,7 @@ def translate_cues(
             model=model,
             contents=f"Translate these subtitle lines:\n\n{body}",
             config=types.GenerateContentConfig(
-                system_instruction=_system(target_lang),
+                system_instruction=system,
                 response_mime_type="application/json",
                 response_schema=_Result,
                 temperature=0.3,
@@ -120,7 +141,10 @@ def translate_cues(
         raise RuntimeError("字幕翻譯沒有回傳任何內容")
 
     result = _Result.model_validate_json(response.text)
-    mapping = {line.index: line.text.strip() for line in result.lines if line.text.strip()}
+    mapping = {
+        line.index: fix_names(line.text.strip(), glossary_text, target_lang)
+        for line in result.lines if line.text.strip()
+    }
 
     meta = getattr(response, "usage_metadata", None)
     prompt_tokens = getattr(meta, "prompt_token_count", 0) or 0

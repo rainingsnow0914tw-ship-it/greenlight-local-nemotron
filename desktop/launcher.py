@@ -72,11 +72,17 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
-def _start_server(port: int):
+def _backend_on_path() -> None:
+    """讓 `import app` 找得到後端（打包後在解開的資料夾、開發時在 repo/backend）。"""
     root = _root()
     backend = root / "backend" if (root / "backend").exists() else root
-    sys.path.insert(0, str(backend))
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
     os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
+
+def _start_server(port: int):
+    _backend_on_path()
     import uvicorn
 
     from app.main import app
@@ -99,15 +105,82 @@ def _wait_up(url: str, seconds: float = 60) -> bool:
     return False
 
 
+def _running_file() -> Path:
+    """「已經有一個在跑」的標記：放在設定的家（每台電腦固定一個位置）。"""
+    _backend_on_path()
+    from app.services.env_boot import config_home
+
+    home = config_home()
+    home.mkdir(parents=True, exist_ok=True)
+    return home / "running.json"
+
+
+def _existing_server() -> str | None:
+    """已經開著的那一個還活著就回它的網址。
+
+    為什麼：以前每次點開都挑一個新的埠、開一個新的後端 —— 點兩次就有兩個後端同時讀寫同一個家
+    （專案檔互相蓋掉、兩邊同時送生成搶顯示卡、學習紀錄兩邊一起寫）。所以只能單開，不能多開。"""
+    import json
+
+    try:
+        url = json.loads(_running_file().read_text(encoding="utf-8")).get("url")
+    except (OSError, ValueError):
+        return None
+    return url if url and _wait_up(url, seconds=3) else None
+
+
+def _focus_existing_window() -> bool:
+    """找到已經開著的 Greenlight 視窗（照標題）就還原、叫到最前面，回 True；不是 Windows 或找不到回 False。"""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    hwnd = user32.FindWindowW(None, TITLE)
+    if not hwnd:
+        return False
+    if user32.IsIconic(hwnd):
+        user32.ShowWindow(hwnd, 9)          # SW_RESTORE：縮到工作列的要先還原
+    user32.ShowWindow(hwnd, 5)              # SW_SHOW
+    user32.SetForegroundWindow(hwnd)
+    return True
+
+
 def main() -> int:
     _attach_log()
     _quiet_subprocesses()
+    import json
+
+    url = _existing_server()
+    if url and "--server" not in sys.argv:
+        # 第二次點開：把原本的視窗叫到最前面就結束（舊版開第二個視窗連同一個後端，
+        #    看起來就是雙開；而且第一個視窗一關、後端跟著關，第二個視窗就死了）。
+        #    找不到視窗（例如只開了 --server 測試用的後端）才開一個視窗連過去。
+        if _focus_existing_window():
+            return 0
+        import webview
+
+        webview.create_window(TITLE, url, width=1440, height=920, min_size=(900, 640))
+        webview.start()
+        return 0
     port = _free_port()
     url = f"http://127.0.0.1:{port}"
     server = _start_server(port)
     if not _wait_up(url):
         print("Greenlight Local could not start its local server", file=sys.stderr)
         return 1
+    _running_file().write_text(json.dumps({"url": url, "pid": os.getpid()}), encoding="utf-8")
+    try:
+        return _serve(server, url)
+    finally:
+        try:
+            if json.loads(_running_file().read_text(encoding="utf-8")).get("pid") == os.getpid():
+                _running_file().unlink()
+        except (OSError, ValueError):
+            pass
+
+
+def _serve(server, url: str) -> int:
     if "--server" in sys.argv:
         print(url, flush=True)
         # 打包成無主控台的 exe 時 print 看不到：測試用 --url-file 把網址寫進檔案

@@ -252,7 +252,7 @@ def open_folder(body: FolderIn):
 def machine_check(drive: str = "C:\\"):
     from ..machine import doctor
 
-    return doctor.run(settings_store.load().get("comfy_url", "http://127.0.0.1:8189"), drive)
+    return doctor.run(settings_store.comfy_url(), drive)
 
 
 # ── 一鍵安裝（背景跑，畫面輪詢進度）──────────────────────────────────────
@@ -279,6 +279,15 @@ def machine_license():
                        for n, m in stack.MODELS.items() if not m.get("unverified")]}
 
 
+@machine_router.post("/install/cancel")
+def machine_install_cancel():
+    """取消一鍵安裝：下載中的檔案停在這裡（.part 留著，下次按安裝接著下）。"""
+    from ..machine import installer
+
+    installer.CANCEL.set()
+    return {"cancelling": _install["status"] == "running"}
+
+
 @machine_router.post("/install")
 def machine_install(body: InstallIn):
     import threading
@@ -292,6 +301,7 @@ def machine_install(body: InstallIn):
     g = doctor.gpu()
     cap = g["compute_cap"] if g else 12.0
     _install.update(status="running", log=[], target=body.target)
+    installer.CANCEL.clear()
 
     def run():
         try:
@@ -304,10 +314,14 @@ def machine_install(body: InstallIn):
                 else:
                     _install["log"].append(ev)
             _install["status"] = "done"
-            if body.start:
-                data = settings_store.load()
-                data["comfy_url"] = f"http://127.0.0.1:{installer.DEFAULT_PORT}"
-                settings_store.save(data)
+            # 裝在哪裡、位址是什麼都記下來：之後每次開 app，沒在跑就自己啟動（installer.ensure_running）
+            data = settings_store.load()
+            data["comfy_home"] = body.target
+            data["comfy_url"] = f"http://127.0.0.1:{installer.DEFAULT_PORT}"
+            settings_store.save(data)
+        except installer.InstallCancelled as exc:
+            _install["log"].append({"step": "cancelled", "status": "cancelled", "detail": f"cancelled during {exc}"})
+            _install["status"] = "cancelled"
         except demo_mode.DemoBlocked:
             # 專案規矩（接線檢查會查）：籠統 except 之前一律先放行 DemoBlocked
             _install["status"] = "failed"
@@ -336,6 +350,7 @@ _image_install: dict = {"status": None, "log": []}
 class ImageModelsIn(BaseModel):
     accept_license: bool = False
     models_dir: str | None = None     # ComfyUI 沒開時，使用者用「瀏覽…」選的 models 資料夾
+    only_upscale: bool = False        # 只裝成片放大模型（85 MB），不裝 Qwen 生圖（40 GB）
 
 
 @machine_router.get("/image-models")
@@ -343,19 +358,16 @@ def image_models_info(models_dir: str | None = None):
     """畫面要顯示的：授權、每個檔多大、這台 ComfyUI 已經有哪些、目前下載進度。"""
     from ..machine import installer, stack
 
-    url = settings_store.load().get("comfy_url", "http://127.0.0.1:8189")
+    url = settings_store.comfy_url()
     asked = installer.comfy_model_folders(url)
     # ComfyUI 沒開：用使用者選的 models 資料夾來看已經有哪些
     folders = asked or ({m["folder"]: str(pathlib.Path(models_dir) / m["folder"]) for m in stack.IMAGE_MODELS.values()}
                         if models_dir else {})
     files = []
     for name, m in stack.IMAGE_MODELS.items():
-        have = None
-        if folders.get(m["folder"]):
-            p = pathlib.Path(folders[m["folder"]]) / name
-            have = p.exists() and p.stat().st_size == m["size"]
+        have = installer.already_have(url, m["folder"], name, m["size"], folders.get(m["folder"]))
         files.append({"name": name, "folder": m["folder"], "gb": round(m["size"] / 2**30, 1), "present": have})
-    return {"license": "Apache-2.0", "license_url": stack.IMAGE_LICENSE_URL, "comfy_answering": bool(asked),
+    return {"license": "Apache-2.0 (Qwen-Image) · BSD-3 (Real-ESRGAN)", "license_url": stack.IMAGE_LICENSE_URL, "comfy_answering": bool(asked),
             "comfy_url": url, "files": files, "total_gb": round(sum(m["size"] for m in stack.IMAGE_MODELS.values()) / 2**30, 1),
             "job": _image_install}
 
@@ -370,12 +382,12 @@ def image_models_install(body: ImageModelsIn):
         return _image_install
     if not body.accept_license:
         raise HTTPException(400, "accept the model license first")
-    url = settings_store.load().get("comfy_url", "http://127.0.0.1:8189")
+    url = settings_store.comfy_url()
     _image_install.update(status="running", log=[])
 
     def run():
         try:
-            for ev in installer.install_image_models(url, body.models_dir):
+            for ev in installer.install_image_models(url, body.models_dir, body.only_upscale):
                 if (_image_install["log"] and _image_install["log"][-1]["step"] == ev["step"]
                         and _image_install["log"][-1]["status"] == "running"):
                     _image_install["log"][-1] = ev

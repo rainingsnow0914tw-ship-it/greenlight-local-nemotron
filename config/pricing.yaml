@@ -44,8 +44,10 @@ veo:
       resolution: "736p"
       audio_included: true
       supports_reference_images: true
-      supports_first_frame: false               # 首幀接末幀還沒接進來（下一步）
-      max_continuity_chain: 0
+      supports_first_frame: true                # 上一鏡末幀修畫質（RealESRGAN）→ MiniMaxH3AddGuide 釘第 0 格
+      cards_with_first_frame: true              # 接幀時參考卡照餵（作者管線：每鏡都餵卡，防衣服與臉漂）
+      max_continuity_chain: 30                  # 一鏡到底全部接幀。每接一次末幀先修畫質、參考卡照餵，靠這兩個防糊防漂
+      silence_seed_seconds: 16                  # 有人沒台詞的鏡，從第 0 格釘幾秒絕對靜音（16＝整鏡；節點會裁到片長）。s061_17b 配對：只釘 1 秒 → 3 秒後人聲 -8dB；整鏡 → 人聲 -180dB，定案整鏡
       use_case: "你的顯示卡（驗證過：RTX 5090 Laptop 24GB），一鏡約 5～6 分鐘，不花錢。"
     omni_flash_720p:
       label: "Omni Flash · 720p"

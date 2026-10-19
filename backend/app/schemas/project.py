@@ -194,6 +194,10 @@ class ProjectState(BaseModel):
 
     stage: Stage = Stage.CREATED
 
+    # 內建範例的標示（scripts/make_sample.py 寫入）：{"title": {zh,en,ja}, "note": {zh,en,ja}}
+    #    這一例示範什麼、走哪條路 —— 三語分開寫，不用機器翻（三例要在 app 裡講清楚、三語乾淨）
+    sample_info: dict | None = None
+
     # ---- 各階段的產物 ----
     script_text: str = Field(
         default="",
@@ -480,4 +484,34 @@ class ProjectState(BaseModel):
             "format_id": self.format_id,
             "aspect_ratio": self.aspect_ratio,
             "updated_at": self.updated_at.isoformat(),
+            "rail_stage": self.rail_stage.value,
+            "sample_info": self.sample_info,
         }
+
+    @property
+    def rail_stage(self) -> Stage:
+        """左側進度燈該亮到哪 —— 只給顯示用，不寫回 stage。
+
+        stage 只記全片一次性的關（解析、定調、選角），選角之後的分鏡、試拍、
+        生成、接片都是每段各自做的，stage 不會再往前走。進度燈若照 stage 畫，
+        做完整部片的專案也永遠停在「選角」（範例專案實證：
+        使用者以為沒有分鏡）。所以這裡取 stage 與「走最遠那一段」的較後者。
+        stage 本身不動：退回（rewind_to）靠它判斷要清掉什麼。
+        """
+        from .segment import SegmentStatus
+
+        by_status = {
+            SegmentStatus.DONE: Stage.ASSEMBLED,
+            SegmentStatus.GENERATING: Stage.GENERATING,
+            SegmentStatus.TEST_SHOT_PASSED: Stage.TEST_SHOT_PASSED,
+            SegmentStatus.PROMPTS_READY: Stage.PROMPTS_READY,
+            SegmentStatus.SHOTS_PLANNED: Stage.SHOTS_PLANNED,
+        }
+        best = self.stage
+        candidates = [by_status[s.status] for s in self.segments if s.status in by_status]
+        if self.film_output_uri:
+            candidates.append(Stage.ASSEMBLED)
+        for c in candidates:
+            if c.order > best.order:
+                best = c
+        return best

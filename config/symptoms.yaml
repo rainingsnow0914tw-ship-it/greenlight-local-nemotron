@@ -154,3 +154,19 @@ symptoms:
       source: 作者規則 08_招式 法則二十、症狀表 C 段
       source_en: "Author rules, prompt techniques rule 20; symptom table section C"
       source_ja: "作者のルール：プロンプトの書き方 第20則、症状表 C 節"
+
+- id: S10
+  title: {zh: 台詞結尾沒唸完（被切掉）, en: The end of the line is cut off, ja: セリフの最後が切れている}
+  detect: {check: tail_cut, level: [fail]}
+  wrong_guess: 整句相似度 0.9 就算過；或剪接時把下一鏡往後推一點就好
+  causes:
+    - cause: 開口前的動作比預期長（擦眼淚、走路這種手上或腳上的事要 2.5～5 秒），台詞被擠到片尾、最後幾個字超出片長
+      cause_en: "The action before the line took longer than planned (wiping tears or walking takes 2.5–5 s), so the line was pushed to the end and its last words fell past the end of the clip"
+      cause_ja: "セリフ前の動作が予定より長く（涙を拭く・歩くなどは 2.5〜5 秒かかる）、セリフが後ろにずれて最後の数文字がカットの外に出た"
+      fix: {action: lengthen_shot, zh: 這一鏡加 1～2 秒重生（剪接救不回來，沒唸的字不存在）；或把開口前的動作改短, en: "Regenerate the shot 1–2 s longer (editing cannot save it — the missing words were never spoken), or shorten the action before the line", ja: "カットを 1〜2 秒長くして作り直す（編集では直せない。読まれていない文字は存在しない）。またはセリフ前の動作を短くする"}
+      example:
+        before: "9 秒｜月音用手背擦掉眼淚，之後冷冷地瞪著 Lisa…｜聽到「…面白い噂だと思ってるで」"
+        after: "10 秒｜同一句表演｜聽到「…面白い噂だと思ってるだけ？」"
+      source: Greenlight Local 2026-10-17 s061_15（9→10 秒）；尾字檢查在第 61 場 18 鏡誤報 0
+      source_en: "Greenlight Local 2026-10-17 s061_15 (9 s → 10 s); the tail check had 0 false alarms on 18 shots of scene 61"
+      source_ja: "Greenlight Local 2026-10-17 s061_15（9→10 秒）。末尾チェックは第 61 場 18 カットで誤検出 0"

@@ -8,7 +8,10 @@
 
 from __future__ import annotations
 
+import re
+
 from ..schemas.shot import CameraMove, Shot, ShotType
+from . import gates
 
 # 導演迴圈的精細運鏡 → Greenlight 的大類（只給統計用；生成照精細的寫）
 _MOVE = {
@@ -29,6 +32,16 @@ def _base_duration(seconds: float) -> int:
 def to_greenlight_shots(dscene: dict, dshots: list[dict], scene_number: int) -> list[Shot]:
     """一場的導演分鏡 → Greenlight Shot 清單。角色代號（luna）換回劇本裡的名字（月音）。"""
     names = {cid: c.get("name") or cid for cid, c in (dscene.get("characters") or {}).items()}
+
+    def zh_names(text: str | None) -> str | None:
+        """中文表演句裡模型自己拼的代號／拼音（「看向 Yueyin」）換回劇本名字 —— 渲染模型不認得 Yueyin 是誰。"""
+        for cid, c in (dscene.get("characters") or {}).items():
+            zh = c.get("name_zh") or c.get("name")
+            if text and zh and cid != zh:
+                text = re.sub(rf"(?i)(?<![A-Za-z]){re.escape(cid)}(?![A-Za-z])", zh, text)
+        return text
+
+    dshots = [{**s, "visual_prompt": zh_names(s.get("visual_prompt"))} for s in dshots]
     out = []
     for i, s in enumerate(dshots, 1):
         seconds = float(s.get("duration_seconds") or 6)
@@ -56,4 +69,17 @@ def to_greenlight_shots(dscene: dict, dshots: list[dict], scene_number: int) -> 
                             for d in s.get("dialogue_lines") or []],
             director_scene_id=dscene.get("scene_id"),
         ))
+    # 接幀只給「馬上接連戲動作」的鏡（作者管線的做法）：剪接上的前一鏡、同一個地點、同一批人
+    # → 動作直接延續，接上一鏡末幀。換人、換地點＝中間有過渡，不接（接了只會把姿勢和漂移帶下去）。
+    # 比的是站位所在的地點、不是站位代號：同一個洗手台區分成 A、B 兩側，一鏡到底時鏡頭換一側仍是連續的。
+    # 鏈長上限與跨場次由 services/continuity.decide 在生成時再擋一次。
+    spots = (dscene.get("render_zh") or {}).get("spots") or {}
+    where = lambda sh: (spots.get(sh.spot) or {}).get("location") or sh.spot
+    for prev, cur in zip(out, out[1:]):
+        if (cur.spot and where(cur) == where(prev)
+                and set(cur.characters_in_frame) == set(prev.characters_in_frame)
+                and cur.characters_in_frame
+                and not gates.chain_problem(prev.shot_type.value, cur.shot_type.value,
+                                            prev.characters_in_frame, cur.characters_in_frame)):
+            cur.first_frame_from = prev.shot_id
     return out

@@ -82,6 +82,36 @@ gates in `gates.py` enforce the mechanical ones; the rest are for you, the direc
     a meaning, it draws the gesture literally. A person in a fight grips the sink, steps in,
     turns away, presses a hand to their chest — real actions whose meaning the audience reads.
 
+26. **Two people talking in the same place: keep them in one frame.** When both characters are
+    in the room and trading lines, the default shot is a two-shot: both in `characters_in_frame`,
+    `blocking` set, the lines as `dialogue_lines` in speaking order (rule 6), each person's action
+    named (rule 21). Cutting to one face for every line feels choppy and hides who is reacting to
+    whom. Cut to a single only for a moment that needs one face — the key line, a reaction — and
+    then come back to the two-shot. A two-shot can carry two or three short lines; still keep it
+    within 10 seconds (rule 7).
+27. **A shot that continues from the previous shot's last frame inherits its framing.** Consecutive
+    shots in the same place with the same people are chained (the previous end frame becomes this
+    shot's first frame). So the next shot must stay within one size step of the previous one
+    (WIDE ↔ MEDIUM ↔ MEDIUM_CLOSE ↔ CLOSE_UP) and must not need anyone the previous frame lacks —
+    otherwise the model holds the old framing for about 1.5 s and then hard-cuts to a new one,
+    sometimes inventing an extra person. Someone may still *enter* (say they walk in / come out).
+    If you need a big change of size or a different cast, plan it as a fresh start, not a chain.
+
+28. **Words the render model takes literally, and lines too short to say.** Poetic 眼裡 / 心裡 / 腦海
+    get drawn as light inside an eye — describe what is visible instead. A "drop" of tears becomes one
+    big bead stuck on the face — write 一道細細的淚痕順著臉頰流下來. A spoken line of 3 characters or
+    fewer comes out garbled: put it in the same shot as the line before or after it, keeping every word
+    (4–8 characters is risky too). Don't have the speaker eat or drink while talking. 「！」 pitches the
+    voice up and slurs it — let 、/。 and particles carry the emotion. Naming the same object twice
+    (書桌…書桌) can draw two of them — refer back with 它. An embrace needs a headcount (她一個人…).
+29. **An action that changes something has a start and an end.** 削著／切著／一直揉 makes the model
+    repeat the motion back and forth for the whole shot. Write each step and its result
+    (削斷、切成兩半、吃掉、揉完眼睛把手放下).
+30. **Two people with no first frame: say where each one starts.** The first clause of the
+    performance line places them (站在…前／坐在…旁／面對面), otherwise the model invents the blocking.
+31. **No pulling back (DOLLY_OUT).** Pulling out reveals space the plates never showed, and the model
+    fills it with invented set and extra people. Stay put, push in, or cut to a wider shot.
+
 ## Output language
 
 - `visual_prompt` (the performance line) is written in **Traditional Chinese**, the
@@ -100,8 +130,9 @@ gates in `gates.py` enforce the mechanical ones; the rest are for you, the direc
   TRACK (camera backs away at her walking pace), FOLLOW (camera slides alongside). Let the camera move with the
   emotion: push in when a line hurts, pull focus when someone is alone with a thought, track when someone walks
   into a confrontation. A scene where the camera never moves plays flat.
-  The local engine gets NO first frame (only character and set reference images), so with it: never PUSH_RETURN
-  or PAN_RETURN (the camera has no start to return to — it only pushes in); in CLOSE_UP and MEDIUM_CLOSE act with
-  the head, eyes and shoulders, not the hands (the camera follows the hands and loses the face).
+  On the local engine a fresh-start shot (not chained, rule 27) gets NO first frame (only character and set
+  reference images), so for those: never PUSH_RETURN or PAN_RETURN (the camera has no start to return to — it only
+  pushes in); in CLOSE_UP and MEDIUM_CLOSE act with the head, eyes and shoulders, not the hands (the camera follows
+  the hands and loses the face). Chained shots start from the previous frame and are free of these two limits.
 - `voice_role`: character (on-screen speaker), offscreen (heard, not seen), narration, none
 - `blocking` (two people in frame): side_by_side or face_to_face

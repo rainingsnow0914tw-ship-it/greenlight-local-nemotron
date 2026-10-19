@@ -15,7 +15,7 @@ import {
   type CSSProperties,
 } from 'react'
 import { api, type Lang, type ProgressSummary } from './api'
-import { setUiLang } from './sysText'
+import { nameText, setUiLang } from './sysText'
 import { COPY, LANGS, STAGE_DESCRIPTIONS, STAGE_NAMES, STAGE_ORDER } from './i18n'
 import { Icon, IconDefs, Logo, STAGE_ICONS } from './components/Icons'
 import { LearningPanel } from './components/LearningPanel'
@@ -24,6 +24,7 @@ import { Dropzone } from './components/Dropzone'
 import { UploadReview, type UploadResult } from './components/UploadReview'
 import { ProjectView } from './components/ProjectView'
 import { SegmentView } from './components/SegmentView'
+import { FixShotButton } from './components/FixShotButton'
 import { CastingView } from './components/CastingView'
 import { MediaLibrary } from './components/MediaLibrary'
 
@@ -81,6 +82,8 @@ export default function App() {
     return (saved === 'en' || saved === 'ja' ? saved : 'zh') as Lang
   })
   const [view, setView] = useState<View>({ kind: 'home' })
+  const [segmentKey, setSegmentKey] = useState(0)   // 修鏡之後重新載入段落頁
+  const [fixNote, setFixNote] = useState('')
   const [projects, setProjects] = useState<ProgressSummary[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -165,7 +168,10 @@ export default function App() {
   // 目前所在階段 —— 左側光柱用
   const currentStage =
     view.kind === 'project' || view.kind === 'segment'
-      ? projects.find((p) => p.project_id === view.id)?.stage
+      ? (() => {
+          const p = projects.find((x) => x.project_id === view.id)
+          return p?.rail_stage ?? p?.stage
+        })()
       : view.kind === 'review'
         ? 'script_uploaded'
         : undefined
@@ -480,8 +486,14 @@ export default function App() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: 12, marginTop: 6 }}>
               {error}
             </div>
+            {view.kind === 'segment' && (
+              <FixShotButton projectId={view.id} order={view.order} error={error} lang={lang}
+                onFixed={(note) => { setError(''); setFixNote(note); setSegmentKey((k) => k + 1) }} />
+            )}
           </div>
         )}
+
+        {fixNote && view.kind === 'segment' && <div className="notice">{fixNote}</div>}
 
         {view.kind === 'settings' && <SettingsPanel lang={lang} />}
 
@@ -540,11 +552,11 @@ export default function App() {
                         <p className="segment-title">
                           {/* 每個劇本名稱前面都帶劇本 icon，列表一致 */}
                           <Icon name="script" size={80} className="title-icon" />
-                          {p.title}
+                          {p.sample_info?.title?.[lang] ?? nameText(p.title, lang)}
                         </p>
                         <p className="segment-synopsis">
-                          {STAGE_NAMES[lang][p.stage] ?? p.stage_label} ·{' '}
-                          {STAGE_DESCRIPTIONS[lang][p.stage] ?? p.stage_description}
+                          {STAGE_NAMES[lang][p.rail_stage ?? p.stage] ?? p.stage_label} ·{' '}
+                          {STAGE_DESCRIPTIONS[lang][p.rail_stage ?? p.stage] ?? p.stage_description}
                         </p>
                       </div>
                       <div className="segment-meta">
@@ -569,6 +581,10 @@ export default function App() {
                           title={{ zh: "用同一份劇本開一個全新的版本，進度歸零，這個專案不受影響", en: "Start a fresh version from the same script; this project stays as it is", ja: "同じ台本から新しいバージョンを始めます（このプロジェクトはそのまま）" }[lang]}
                           onClick={async (e) => {
                             e.stopPropagation()
+                            // 先問一聲：這顆按鈕緊貼專案標題，範例 3 誤按一次就多出一個空專案
+                            if (!window.confirm({ zh: `用「${nameText(p.title, lang)}」的劇本開一個全新的版本（進度歸零，這個專案不受影響）？`,
+                              en: `Start a fresh version of “${nameText(p.title, lang)}” from the same script (progress starts over; this project stays)?`,
+                              ja: `「${nameText(p.title, lang)}」の台本から新しいバージョンを始めますか（進捗はゼロから、このプロジェクトはそのまま）？` }[lang])) return
                             setBusy(true)
                             setError(null)
                             try {
@@ -604,7 +620,7 @@ export default function App() {
                               ).toFixed(1)
                               const ok = window.confirm(
                                 `${c.deleteConfirm}\n\n` +
-                                  `「${pv.title}」\n` +
+                                  `「${nameText(pv.title, lang)}」\n` +
                                   `${c.deleteFiles}：${pv.will_delete.media_files}（${mb} MB）\n` +
                                   `${c.deleteSpent}：$${pv.will_delete.spent_usd.toFixed(2)}\n\n` +
                                   `${c.deleteKeeps}`,
@@ -697,6 +713,7 @@ export default function App() {
             症狀是版面問題不是資料問題時，先確認元素在不在該在的容器裡。 */}
         {view.kind === 'segment' && (
           <SegmentView
+            key={segmentKey}
             copy={c}
             lang={lang}
             projectId={view.id}

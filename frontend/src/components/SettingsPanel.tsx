@@ -39,10 +39,10 @@ const T = {
     install: '一鍵安裝影片引擎', installNote: '會下載官方 ComfyUI 攜帶版（約 2 GB）和影片模型（約 42 GB）；已經有模型資料夾的話填進來就不用重下。',
     license: '影片模型 MiniMax H3 的授權不適用於這些地區：', licenseRead: '看授權全文', accept: '我讀過授權，而且不在上面這些地區使用',
     browse: '瀏覽…', open: '打開資料夾', storage: '存放位置', dataDir: '作品資料夾（專案、圖、影片、學習紀錄）', exportDir: '成品輸出資料夾（做好的影片另存一份在這）', free: '剩餘空間', change: '換位置', moveAsk: '要把現有作品一起搬過去嗎？（按「取消」＝新位置從空的開始，舊的留在原處）', moved: '已換到新位置',
-    target: '安裝到哪個資料夾', reuse: '已經有模型資料夾（選填）', installBtn: '開始安裝', installing: '安裝中…', installDone: '裝好了', installFailed: '安裝停下來了',
-    img: '生圖模型（選角、角色表、首幀用）', imgNote: 'Qwen-Image 2512 —— 下載進你的 ComfyUI，不用自己開 ComfyUI 操作。商業可用（Apache 2.0）。已經有的檔不會重下；中斷了再按一次會接著下。',
+    target: '安裝到哪個資料夾', reuse: '已經有模型資料夾（選填；空著會自動找電腦裡現成的）', installBtn: '開始安裝', installCancel: '取消安裝（下到一半的會留著，下次接著下）', installing: '安裝中…', installDone: '裝好了', installFailed: '安裝停下來了',
+    img: '生圖與放大模型（選角、角色表、首幀、接幀修畫質、成片放大）', imgNote: 'Qwen-Image 2512 ＋ Real-ESRGAN 放大模型 —— 下載進你的 ComfyUI，不用自己開 ComfyUI 操作。商業可用（Apache 2.0／BSD-3）。已經有的檔不會重下；中斷了再按一次會接著下。',
     imgAccept: '我已閱讀並同意這個模型的授權（Apache 2.0）', imgWhere: 'ComfyUI 沒開，問不到模型放哪 —— 請選 ComfyUI 的 models 資料夾（裡面有 diffusion_models、loras…）',
-    imgAsked: '已經問過 ComfyUI 模型放哪，會直接下載進去', imgHave: '已經有', imgNeed: '要下載', imgBtn: '下載生圖模型', imgDone: '生圖模型好了：設定頁③「生角色圖」選「本機」就會用它',
+    imgAsked: '已經問過 ComfyUI 模型放哪，會直接下載進去', imgHave: '已經有', imgNeed: '要下載', imgBtn: '下載生圖與放大模型', imgUpBtn: '只下載成片放大模型（85 MB）', imgDone: '生圖模型好了：設定頁③「生角色圖」選「本機」就會用它',
   },
   en: {
     title: 'Settings', lede: 'First time? Go top to bottom: check this computer, then add your own keys.',
@@ -58,10 +58,10 @@ const T = {
     install: 'Install the video engine', installNote: 'Downloads the official ComfyUI portable build (about 2 GB) and the video models (about 42 GB). If you already have a models folder, enter it and nothing is downloaded twice.',
     license: 'The MiniMax H3 video model license does not cover:', licenseRead: 'Read the license', accept: 'I have read the license and will not use it in those regions',
     browse: 'Browse…', open: 'Open folder', storage: 'Where things are saved', dataDir: 'Projects folder (projects, images, videos, learning records)', exportDir: 'Finished-video folder (a copy of every finished film goes here)', free: 'free', change: 'Change', moveAsk: 'Move your existing projects to the new folder? (Cancel = start empty there; old projects stay where they are)', moved: 'Moved',
-    target: 'Install folder', reuse: 'Existing models folder (optional)', installBtn: 'Install', installing: 'Installing…', installDone: 'Installed', installFailed: 'Install stopped',
-    img: 'Image model (casting, character sheets, first frames)', imgNote: 'Qwen-Image 2512 — downloaded straight into your ComfyUI; no need to touch ComfyUI yourself. Commercial use allowed (Apache 2.0). Files you already have are skipped; if it stops, press again to resume.',
+    target: 'Install folder', reuse: 'Existing models folder (optional — left empty, the app looks for models already on this computer)', installBtn: 'Install', installCancel: 'Cancel (partial downloads are kept and resume next time)', installing: 'Installing…', installDone: 'Installed', installFailed: 'Install stopped',
+    img: 'Image and upscale models (casting, character sheets, first frames, cleaning chained frames, finishing in 1080p)', imgNote: 'Qwen-Image 2512 + Real-ESRGAN upscalers — downloaded straight into your ComfyUI; no need to touch ComfyUI yourself. Commercial use allowed (Apache 2.0 / BSD-3). Files you already have are skipped; if it stops, press again to resume.',
     imgAccept: 'I have read and accept this model’s license (Apache 2.0)', imgWhere: 'ComfyUI is not running, so it can’t tell us where models go — pick ComfyUI’s models folder (it contains diffusion_models, loras…)',
-    imgAsked: 'Asked ComfyUI where its models go — downloading straight there', imgHave: 'have it', imgNeed: 'to download', imgBtn: 'Download the image model', imgDone: 'Image model ready: in ③, set “Character images” to Local to use it',
+    imgAsked: 'Asked ComfyUI where its models go — downloading straight there', imgHave: 'have it', imgNeed: 'to download', imgBtn: 'Download the image and upscale models', imgUpBtn: 'Only the upscale models for finishing (85 MB)', imgDone: 'Image model ready: in ③, set “Character images” to Local to use it',
   },
   ja: {
     title: '設定', lede: '初めての方は上から順に：このPCで動画が作れるか確認して、ご自分のキーを入れてください。',
@@ -77,10 +77,10 @@ const T = {
     install: '動画エンジンをワンクリックで導入', installNote: '公式 ComfyUI ポータブル版（約 2GB）と動画モデル（約 42GB）をダウンロードします。モデルのフォルダーがあれば入力すると再ダウンロードしません。',
     license: '動画モデル MiniMax H3 のライセンス対象外の地域：', licenseRead: 'ライセンス全文', accept: 'ライセンスを読み、これらの地域では使用しません',
     browse: '参照…', open: 'フォルダを開く', storage: '保存場所', dataDir: '作品フォルダー（プロジェクト・画像・動画・学習記録）', exportDir: '完成動画の出力先（完成した動画のコピーをここに保存）', free: '空き', change: '変更', moveAsk: '既存の作品も新しい場所へ移しますか？（キャンセル＝新しい場所は空から、古い作品は元の場所に残ります）', moved: '移動しました',
-    target: 'インストール先', reuse: '既存のモデルフォルダー（任意）', installBtn: 'インストール', installing: 'インストール中…', installDone: '完了', installFailed: '停止しました',
-    img: '画像モデル（キャスティング・キャラ表・最初のフレーム用）', imgNote: 'Qwen-Image 2512 —— あなたの ComfyUI に直接ダウンロードします。ComfyUI を操作する必要はありません。商用利用可（Apache 2.0）。既にあるファイルはスキップ、中断したらもう一度押せば続きから。',
+    target: 'インストール先', reuse: '既存のモデルフォルダー（任意。空欄ならパソコン内の既存モデルを自動で探します）', installBtn: 'インストール', installCancel: 'キャンセル（途中のダウンロードは残り、次回続きから）', installing: 'インストール中…', installDone: '完了', installFailed: '停止しました',
+    img: '画像・アップスケールモデル（キャスティング・キャラ表・最初のフレーム・つなぎフレームの補正・1080p 仕上げ）', imgNote: 'Qwen-Image 2512 ＋ Real-ESRGAN アップスケーラー —— あなたの ComfyUI に直接ダウンロードします。ComfyUI を操作する必要はありません。商用利用可（Apache 2.0／BSD-3）。既にあるファイルはスキップ、中断したらもう一度押せば続きから。',
     imgAccept: 'このモデルのライセンス（Apache 2.0）を読み、同意します', imgWhere: 'ComfyUI が起動していないため保存先を聞けません —— ComfyUI の models フォルダー（diffusion_models、loras… が入っている）を選んでください',
-    imgAsked: 'ComfyUI に保存先を確認済み —— そこへ直接ダウンロードします', imgHave: 'あり', imgNeed: 'ダウンロード', imgBtn: '画像モデルをダウンロード', imgDone: '画像モデルの準備完了：③の「キャラクター画像」を「ローカル」にすると使われます',
+    imgAsked: 'ComfyUI に保存先を確認済み —— そこへ直接ダウンロードします', imgHave: 'あり', imgNeed: 'ダウンロード', imgBtn: '画像・アップスケールモデルをダウンロード', imgUpBtn: '仕上げ用アップスケールモデルだけ（85 MB）', imgDone: '画像モデルの準備完了：③の「キャラクター画像」を「ローカル」にすると使われます',
   },
 }
 
@@ -200,9 +200,10 @@ export function SettingsPanel({ lang }: { lang: Lang }) {
     setImg(r)
     if (r.job?.status === 'running') setTimeout(() => void pollImg(dir), 2000)
   }
-  const installImg = async () => {
+  // onlyUpscale：只要成片放大（Real-ESRGAN），不要 Qwen 生圖 40 GB（範例 3：成片退回 lanczos，只缺這 85 MB）
+  const installImg = async (onlyUpscale = false) => {
     await fetch('/api/machine/image-models', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accept_license: imgAccepted, models_dir: imgDir || null }) })
+      body: JSON.stringify({ accept_license: imgAccepted, models_dir: imgDir || null, only_upscale: onlyUpscale }) })
     void pollImg(imgDir || undefined)
   }
   useEffect(() => {
@@ -312,6 +313,12 @@ export function SettingsPanel({ lang }: { lang: Lang }) {
             <button className="btn primary" disabled={!accepted || inst?.status === 'running'} onClick={() => void install()}>
               {inst?.status === 'running' ? t.installing : t.installBtn}
             </button>
+            {inst?.status === 'running' && (
+              // ：以前沒有取消鈕，按錯只能把 app 關掉
+              <button className="btn ghost" onClick={() => void fetch('/api/machine/install/cancel', { method: 'POST' }).then(() => pollInstall())}>
+                {t.installCancel}
+              </button>
+            )}
           </div>
           {inst?.log && inst.log.length > 0 && (
             <ul className="direction-log">
@@ -366,6 +373,11 @@ export function SettingsPanel({ lang }: { lang: Lang }) {
               disabled={!imgAccepted || img.job?.status === 'running' || (!img.comfy_answering && !imgDir)}
               onClick={() => void installImg()}>
               {img.job?.status === 'running' ? t.installing : t.imgBtn}
+            </button>
+            <button className="btn ghost"
+              disabled={!imgAccepted || img.job?.status === 'running' || (!img.comfy_answering && !imgDir)}
+              onClick={() => void installImg(true)}>
+              {t.imgUpBtn}
             </button>
           </div>
           {img.job?.log && img.job.log.length > 0 && (

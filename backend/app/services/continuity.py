@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 
@@ -85,7 +86,7 @@ def _identity_break(shot, src) -> str | None:
     return None
 
 
-def _chain_positions(shots: list, max_chain: int) -> dict[str, int]:
+def _chain_positions(shots: list, max_chain: int, cards_with_frame: bool = False) -> dict[str, int]:
     """算出每一鏡在接幀鏈裡的**有效**位置。
 
     為什麼要有這個函數？
@@ -120,7 +121,7 @@ def _chain_positions(shots: list, max_chain: int) -> dict[str, int]:
             continue
         # 臉的依據不足 → 斷（跟 decide() 同一個判準，兩邊必須一致，
         # 否則位置計算跟實際執行對不上、鏈長上限會算錯）
-        if _identity_break(shot, src):
+        if not cards_with_frame and _identity_break(shot, src):
             pos[shot.shot_id] = 1
             continue
         nxt = pos.get(src_id, 1) + 1
@@ -129,7 +130,7 @@ def _chain_positions(shots: list, max_chain: int) -> dict[str, int]:
     return pos
 
 
-def decide(shot, shots: list, *, max_chain: int = 4) -> ContinuityDecision:
+def decide(shot, shots: list, *, max_chain: int = 4, cards_with_frame: bool = False) -> ContinuityDecision:
     """裁決這一鏡到底接不接上一鏡的末幀。
 
     為什麼要有這個函數？
@@ -176,7 +177,8 @@ def decide(shot, shots: list, *, max_chain: int = 4) -> ContinuityDecision:
             f"這一鏡是第 {shot.scene_number} 場 —— 換場景不接幀，改用硬切。",
         )
 
-    identity_reason = _identity_break(shot, src)
+    # 引擎接幀時參考卡照餵（本機 H3）→ 每張臉都有自己的卡，臉的依據不只末幀那一格，不必為臉斷鏈
+    identity_reason = None if cards_with_frame else _identity_break(shot, src)
     if identity_reason:
         # 同場次、但臉的依據不足：斷鏈帶卡，末幀降級成場景參考圖
         # （scene_anchor_source），場景不靠一句提示詞裸撐。
@@ -187,7 +189,7 @@ def decide(shot, shots: list, *, max_chain: int = 4) -> ContinuityDecision:
             scene_anchor_source=src_id,
         )
 
-    positions = _chain_positions(shots, max_chain)
+    positions = _chain_positions(shots, max_chain, cards_with_frame)
     position = positions.get(shot.shot_id, 1)
     if position == 1:
         # 這裡的斷點跟「跨場次」的斷點意義完全不同：
@@ -208,3 +210,43 @@ def decide(shot, shots: list, *, max_chain: int = 4) -> ContinuityDecision:
         True, src_id, position,
         f"✓ 接上 {src_id} 的末幀（鏈上第 {position}/{max_chain} 鏡）。",
     )
+
+
+def _facing(shot) -> str | None:
+    """表演句寫「X…正面對著鏡頭」的那個 X（沒寫就是 None）。
+
+    找含「正面對著鏡頭」的那一句，取這一鏡的角色裡最先出現在那句的人 ——
+    「月音站在洗手台前、正面對著鏡頭」要回月音，不是「月音站在洗手台前」。"""
+    text = getattr(shot, "performance", None) or getattr(shot, "description", None) or ""
+    clause = next((c for c in re.split(r"[，。；]", text) if "正面對著鏡頭" in c), "")
+    found = [(clause.find(n), n) for n in (shot.characters_in_frame or []) if n and n in clause]
+    return min(found)[1] if found else None
+
+
+def borrow_anchor(shot, shots: list, clips: list) -> str | None:
+    """斷鏈的兩人鏡，借「同站位、已通過」那一鏡的末幀當首幀；找不到回 None。
+
+    為什麼：沒首幀的鏡只剩空景卡撐，模型會跑景（s061_07 跑到戶外樹下、13 長出百葉窗和盆栽、
+    10 背景冒出馬桶）。借一張同樣是「X 正面、Y 背對」的已通過末幀，第 61 場 03／13／14／16／17b 五鏡都一次過
+    （正式管線症狀表：「不連幀、給同景別首幀」）。
+    條件全部要對：同一場、同一組人、同一個人正面對鏡頭、景別差一級以內。少一個就不借 —— 借錯的首幀比沒首幀更糟。
+    """
+    from ..director import gates
+    from ..schemas.segment import ClipStatus
+
+    who = _facing(shot)
+    if getattr(shot, "first_frame_from", None) or len(shot.characters_in_frame or []) < 2 or not who:
+        return None
+    done = {c.shot_id for c in clips if c.status == ClipStatus.APPROVED and c.uri}
+    rank = gates.SIZE_RANK
+    order = [s.shot_id for s in shots]
+    here = order.index(shot.shot_id) if shot.shot_id in order else len(order)
+    cands = [s for s in shots
+             if s.shot_id in done and s.shot_id != shot.shot_id
+             and s.director_scene_id == shot.director_scene_id
+             and set(s.characters_in_frame or []) == set(shot.characters_in_frame)
+             and _facing(s) == who
+             and abs(rank.get(s.shot_type.value, 1) - rank.get(shot.shot_type.value, 1)) <= 1]
+    # 越近越好（站位、情緒最接近）；前面的優先於後面的
+    cands.sort(key=lambda s: (order.index(s.shot_id) > here, abs(order.index(s.shot_id) - here)))
+    return cands[0].shot_id if cands else None

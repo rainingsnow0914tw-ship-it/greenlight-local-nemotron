@@ -38,6 +38,10 @@ HOW_TO_AVOID = {
     "rule 23": "never reuse the same action phrase in 3+ shots — reactions escalate",
     "rule 24": "every split line ends at a sentence end (。？！——)",
     "rule 25": "no miming and no 代表/表示/象徵 — real body actions only",
+    "rule 28": "no 眼裡/心裡/淚珠, no line of 3 characters or fewer on its own (merge it with the line before or after)",
+    "rule 29": "an action that changes something has a start and a result (切成兩半, not 切著)",
+    "rule 30": "two people with no first frame: the first clause says where each one stands",
+    "rule 31": "no DOLLY_OUT",
     "enums": "use only the listed shot_type / camera_move / voice_role values",
     "format": "return only the JSON object, keep the reasoning short",
 }

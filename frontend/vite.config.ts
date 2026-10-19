@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  // 建置直接輸出到後端提供的資料夾：app 與安裝檔都是從 backend/app/static 拿前端。
+  // 以前預設輸出 frontend/dist，要記得另外帶 --outDir；忘了一次，安裝檔就帶著舊介面（進度燈沒更新）。
+  build: { outDir: '../backend/app/static', emptyOutDir: true },
   server: {
     port: 5173,
     // 開發時把 /api 轉給 FastAPI，前端就不用管 CORS 也不用寫死主機。

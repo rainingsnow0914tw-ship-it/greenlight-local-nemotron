@@ -141,6 +141,8 @@ def parse_script(project_id: str) -> dict:
     #    只放在這支 API 的回應裡的話，重新載入專案就消失了，
     #    選角關卡因此拿不到，所有 AI 角色都會被當成人物、給錯方向按鈕。
     state.non_human_characters = usage.get("non_human_characters", [])
+    # 原聲預設跟劇本語言走（以前固定 zh：日文小說打開學語言模式，原聲預設成中文 —— 第三世試跑）
+    state.film_language = {"ja": "ja", "ko": "ko", "en": "en"}.get(screenplay.language or "", state.film_language)
     state.stage = Stage.PARSED
     state.spend.llm_usd += usage["cost_usd"]
     state.record_decision(
@@ -322,7 +324,12 @@ def list_projects() -> dict:
             continue
         if state:
             items.append(state.progress_summary())
-    return {"projects": items}
+    # 自己的專案在前（最近動過的最上面），內建範例排最後、照 1／2／3（標題開頭的「範例 N」）
+    mine = sorted([p for p in items if not str(p.get("project_id", "")).startswith("p-sample-")],
+                  key=lambda p: p.get("updated_at") or "", reverse=True)
+    samples = sorted([p for p in items if str(p.get("project_id", "")).startswith("p-sample-")],
+                     key=lambda p: p.get("title") or "")
+    return {"projects": mine + samples}
 
 
 @router.get("/{project_id}")
@@ -333,6 +340,7 @@ def get_project(project_id: str) -> dict:
 
     return {
         "progress": state.progress_summary(),
+        "sample_info": state.sample_info,
         "screenplay": None
         if not sp
         else {
@@ -564,8 +572,7 @@ def _ensure_segments(state) -> list:
             estimated_seconds=sum(s.estimated_screen_seconds for s in scenes),
             synopsis=scenes[0].action[:120], is_self_contained=True,
         )]
-        project_store.get_store().save(state)
-        return state.segments
+        return _save_segments(state)
     if not plan:
         raise HTTPException(
             status_code=409,
@@ -573,7 +580,19 @@ def _ensure_segments(state) -> list:
         )
 
     state.segments = plan.segments
-    project_store.get_store().save(state)
+    return _save_segments(state)
+
+
+def _save_segments(state) -> list:
+    """只把剛建好的分段寫進「現在」的專案（有鎖、只在那邊還沒有分段時寫）—— 不整份寫回（審查）。"""
+    segs = state.segments
+
+    def fn(st):
+        if not st.segments:
+            st.segments = segs
+
+    fresh = project_store.get_store().mutate(state.project_id, fn)
+    state.segments = fresh.segments
     return state.segments
 
 
@@ -755,6 +774,13 @@ def get_learning(project_id: str) -> dict:
 
     available = ledger.is_available()
     stats = ledger.overall_stats(style_id) if available else {"available": False}
+    sample_final = None
+    if project_id.startswith("p-sample-"):
+        # 內建範例：評審電腦的學習紀錄是空的。不算成功率 —— 每次重拍沒記用的是哪一版提示詞，
+        #    分不出最終版的拍數（只寫「19 鏡全部收下」，不顯示百分比）。
+        shots = [s for sg in state.segments if sg.shot_list for s in sg.shot_list.shots]
+        accepted = sum(1 for sg in state.segments for c in sg.clips if c.status.value == "approved")
+        sample_final = {"accepted": accepted, "total": len(shots)}
 
     notes = None
     try:
@@ -785,6 +811,7 @@ def get_learning(project_id: str) -> dict:
         # 讀提煉層自己的常數，不要在這裡再寫一次數字 ——
         # 兩邊分開寫的話，調門檻只會改到一邊，UI 從此說謊。
         "refine_threshold": refinery.MIN_SAMPLES_TO_REFINE,
+        "sample_final": sample_final,
     }
 
 

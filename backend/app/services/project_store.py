@@ -34,6 +34,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from ..schemas.project import ProjectState
+from . import fsutil
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ class LocalJsonStore(ProjectStore):
         tmp.write_text(
             state.model_dump_json(indent=2, exclude_none=False), encoding="utf-8"
         )
-        tmp.replace(path)  # 原子操作
+        fsutil.replace(tmp, path)  # 原子操作（Windows 被別人開著就重試）
 
     def load(self, project_id: str) -> ProjectState | None:
         path = self._path(project_id)

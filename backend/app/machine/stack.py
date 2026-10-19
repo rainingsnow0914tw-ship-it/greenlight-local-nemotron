@@ -113,10 +113,22 @@ IMAGE_MODELS = {
         "folder": "loras", "size": 849608296,
         "repo": "lightx2v/Qwen-Image-Edit-2511-Lightning", "path": "",
         "sha256": "22226e8d05d354bb356627d428809f5afd7819399b077238a2b70a82883a904f"},
+    # 放大模型（Real-ESRGAN，BSD-3）：接幀前修上一鏡的末幀（不修每接一次糊一點）、成片放大到 1080p。
+    # 官方 GitHub release；大小問 GitHub（Content-Length）、sha256 量作者機器上的檔（兩邊大小一致）。
+    "RealESRGAN_x4plus.pth": {
+        "folder": "upscale_models", "size": 67040989,
+        "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+        "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1"},
+    "RealESRGAN_x4plus_anime_6B.pth": {
+        "folder": "upscale_models", "size": 17938799,
+        "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+        "sha256": "f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da"},
 }
 
 
 def image_hf_url(name: str) -> str:
     """生圖模型檔的下載網址。"""
     m = IMAGE_MODELS[name]
+    if m.get("url"):
+        return m["url"]
     return f"https://huggingface.co/{m['repo']}/resolve/main/{m['path'] + '/' if m['path'] else ''}{name}"

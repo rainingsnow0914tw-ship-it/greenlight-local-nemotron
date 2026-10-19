@@ -29,14 +29,17 @@ class _Char(BaseModel):
     kind: str = Field(description="e.g. 'human woman, office worker' or 'AI, a voice from the laptop'")
     costume: str = Field(description="what they wear in this scene, in English")
     location: str = Field(description="id of the world/location this character is physically in")
-    appearance_zh: str = Field(description="one sentence describing their look for the video model, in the script's language")
+    # 給影片模型看的欄位一律繁體中文（H3 提示詞是中文）：第三世，劇本是日文 → 場景描述寫成日文夾在中文提示詞裡，
+    #    H3 把那串日文當成畫面上的字（控制盤螢幕上出現「塔列昂コアプロセッサの制御盤」）。名字照劇本寫法。
+    appearance_zh: str = Field(description="one sentence describing their look for the video model, in Traditional Chinese "
+                                           "(keep names exactly as written in the script)")
 
 
 class _Spot(BaseModel):
     id: str = Field(description="short ascii id naming a PLACE, e.g. restroom_sinks, stall_door — never a shot type")
     location: str
     description: str = Field(description="the place where the people stand and what is visible behind them, "
-                                         "in the script's language")
+                                         "in Traditional Chinese (keep names exactly as written in the script)")
     description_en: str
 
 
@@ -146,7 +149,7 @@ def to_director_scene(scene: Scene, st: _Staging, style_zh: str, series: str = "
         if re.sub(r"\s+", "", text) not in full:
             # 對不上：回到它說的那一行，由程式自己把引號裡的原文抽出來（最像的那一段）。
             #    實測兩種：模型抄錯字（「剛剛」→「剭剛」）、把『』換成‘’ —— 原文都在那一行裡。
-            fixed = _quote_from_source(text, source or [], ln.source_line)
+            fixed = _quote_from_source(text, source or [], ln.source_line) or _untranslated(text, source or [], ln.source_line)
             if fixed:
                 entry["line"] = fixed
                 entry["repaired_from_source"] = True
@@ -188,6 +191,21 @@ def _quote_from_source(text: str, source: list[str], line_no: int) -> str | None
                 if r > best_ratio:
                     best, best_ratio = q, r
     return best if best_ratio >= 0.8 else None
+
+
+_KANA = re.compile(r"[぀-ヿ]")
+
+
+def _untranslated(text: str, source: list[str], line_no: int) -> str | None:
+    """模型把旁白「翻譯」成別的語言（原文那一行有假名、它寫的沒有）→ 換回原文那一行。
+
+    第三世試跑：第 1 場是系統日誌、沒有「」對白，模型把日文敘述寫成中文旁白「系統記錄異常於…」，
+    跟原文比相似度很低、修不回來 → 台詞導演只改一半變成中日夾雜，H3 唸成亂語。"""
+    i = line_no - 1
+    if not (0 <= i < len(source)) or _KANA.search(text) or not _KANA.search(source[i]):
+        return None
+    line = re.sub(r"\*\*|__|^#+\s*", "", source[i]).strip()
+    return line or None
 
 
 def _ascii_id(name: str) -> str:

@@ -35,6 +35,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import fsutil
+
 # 副檔名對照。模型回什麼 mimeType 就存什麼副檔名 ——
 # 不強制轉檔（轉檔要裝影像函式庫，而且會掉品質）。
 _EXT_BY_MIME = {
@@ -130,7 +132,7 @@ def save(project_id: str, name: str, data: bytes, mime_type: str = "image/png") 
     # 那種半截檔案在 UI 上會變成破圖，而且很難查。
     tmp = folder / f".{filename}.tmp"
     tmp.write_bytes(data)
-    tmp.replace(folder / filename)
+    fsutil.replace(tmp, folder / filename)
 
     return f"{_LOCAL_SCHEME}{project_id}/{filename}"
 

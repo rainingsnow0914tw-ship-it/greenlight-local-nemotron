@@ -95,23 +95,52 @@ def _run(project_id: str, order: int) -> None:
                      spots=list(dscene["render_zh"]["spots"]), characters=[c["name"] for c in dscene["characters"].values()],
                      lines=len(dscene["dialogue"]), unverified=sum(1 for d in dscene["dialogue"] if d.get("unverified")),
                      cost=usage["cost_usd"])
-            final = None
-            for ev in director.direct_iter(dscene):
-                if ev["type"] == "round":
-                    _log(project_id, order, "round", scene=scene.scene_number, round=ev["round"], shots=ev["shots"],
-                         errors=ev["errors"], warnings=ev.get("warnings", 0), rejected=bool(ev.get("rejected")),
-                         seconds=ev.get("seconds"), tokens=(ev.get("usage") or {}).get("total_tokens"),
-                         top=_top_rules(ev.get("issues") or []))
-                elif ev["type"] == "critique":
-                    _log(project_id, order, "critique", scene=scene.scene_number, verdict=ev.get("verdict"),
-                         notes=[{"shots": x.get("shots"), "quote": x.get("quote"), "problem": x.get("problem"),
-                                 "direction": x.get("direction")} for x in ev.get("notes") or []][:8],
-                         overall=ev.get("overall"),
-                         dropped=len(ev.get("dropped_notes") or []), model=ev.get("model"))
-                elif ev["type"] == "done":
-                    final = ev
-            if not final or not final.get("shots"):
-                raise RuntimeError(f"scene {scene.scene_number}: the director produced no shot list")
+            # 長場次切段導（第三世第 2 話試跑：一場 30～40 句台詞，一次要寫 50+ 鏡 →
+            #    思考撞頂回空、或 57 鏡剩 116 錯原樣交回；第 2 場 36 句只寫出 1 鏡）。
+            #    同一個場面調度（站位、空景、人物不變），只把台詞切成每段 ≤ CHUNK_LINES 句，一段一段導再接起來。
+            parts = split_scene(dscene)
+            final = {"shots": [], "status": "passed", "note": ""}
+
+            def direct_part(k, part, scene=scene, parts=parts):
+                done = None
+                for ev in director.direct_iter(part):
+                    if ev["type"] == "round":
+                        _log(project_id, order, "round", scene=scene.scene_number, part=k, parts=len(parts),
+                             round=ev["round"], shots=ev["shots"],
+                             errors=ev["errors"], warnings=ev.get("warnings", 0), rejected=bool(ev.get("rejected")),
+                             seconds=ev.get("seconds"), tokens=(ev.get("usage") or {}).get("total_tokens"),
+                             top=_top_rules(ev.get("issues") or []))
+                    elif ev["type"] == "critique":
+                        _log(project_id, order, "critique", scene=scene.scene_number, part=k, verdict=ev.get("verdict"),
+                             notes=[{"shots": x.get("shots"), "quote": x.get("quote"), "problem": x.get("problem"),
+                                     "direction": x.get("direction")} for x in ev.get("notes") or []][:8],
+                             overall=ev.get("overall"),
+                             dropped=len(ev.get("dropped_notes") or []), model=ev.get("model"))
+                    elif ev["type"] == "done":
+                        done = ev
+                return done
+
+            # 同一場的幾段同時導（每段各自獨立、共用同一份場面調度）：4 段排隊要 45 分鐘，同時跑約 1/4
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=min(len(parts), PARALLEL_PARTS)) as pool:
+                results = list(pool.map(lambda kp: direct_part(*kp), enumerate(parts, 1)))
+            for k, done in enumerate(results, 1):
+                if not done or not done.get("shots"):
+                    raise RuntimeError(f"scene {scene.scene_number} part {k}/{len(parts)}: the director produced no shot list")
+                final["shots"] += done["shots"]
+                if done["status"] != "passed":
+                    final["status"], final["note"] = done["status"], done.get("note", "")
+            for i, sh in enumerate(final["shots"], 1):
+                sh["shot_id"] = f"s{scene.scene_number:03d}_{i:02d}"
+            # 規則 26：正反打合成同框（格式固定的事交給程式，每合一組重跑關卡，變壞就不合）
+            from ..director import two_shots
+
+            final["shots"], pairs = two_shots.merge(dscene, final["shots"])
+            final["shots"], listeners = two_shots.keep_both_in_frame(dscene, final["shots"])
+            if pairs or listeners:
+                _log(project_id, order, "two_shots", scene=scene.scene_number, pairs=pairs + listeners,
+                     shots=len(final["shots"]))
             _log(project_id, order, "scene_done", scene=scene.scene_number, status=final["status"],
                  shots=len(final["shots"]), note=final.get("note", ""))
             all_shots += to_greenlight_shots(dscene, final["shots"], scene.scene_number)
@@ -120,6 +149,13 @@ def _run(project_id: str, order: int) -> None:
             from ..schemas.project import Stage
 
             sg = next(s for s in st.segments if s.order == order)
+            if sg.shot_list is not None:
+                # 重新導：舊鏡頭、試拍、成片、參考卡都是照舊分鏡做的，新分鏡的鏡號會重複
+                # （s001_01 會接到舊的那支影片）。跟 plan-shots force 用同一個共用重置。
+                from ..routes.video import reset_segment_progress
+
+                reset_segment_progress(st, sg)
+                sg.refs_status, sg.refs_log = None, []
             sg.clear_line_direction()   # 新分鏡：舊的台詞導演結果作廢（鏡號會重複）
             sg.shot_list = ShotList(screenplay_title=st.screenplay.title, shots=all_shots,
                                     aspect_ratio=st.aspect_ratio or "16:9",
@@ -143,6 +179,38 @@ def _run(project_id: str, order: int) -> None:
             sg.direction_status = "failed"
 
         store.mutate(project_id, failed)
+
+
+CHUNK_LINES = 10   # 一段最多幾句台詞（第 61 場 21 句一次導得過、第三世 30～40 句導不過）
+PARALLEL_PARTS = 5  # 同時導幾段（Nebius API 呼叫，不吃本機顯示卡）
+
+
+def split_scene(dscene: dict) -> list[dict]:
+    """台詞太多的場次切成幾段（同一份場面調度，只換台詞），每段附上前後文讓導演接得上。"""
+    import copy
+    import math
+
+    lines = dscene.get("dialogue") or []
+    if len(lines) <= CHUNK_LINES:
+        return [dscene]
+    n = math.ceil(len(lines) / CHUNK_LINES)
+    size = math.ceil(len(lines) / n)
+    say = lambda d: f"{d.get('speaker', '')}: {d.get('line') or d.get('text') or ''}"  # noqa: E731
+    parts = []
+    for k in range(n):
+        a, b = k * size, min((k + 1) * size, len(lines))
+        part = copy.deepcopy(dscene)
+        part["dialogue"] = lines[a:b]
+        part["part_note"] = (
+            f"This scene is long, so it is directed in {n} parts. You are directing part {k + 1} of {n}: write shots "
+            "for ONLY the dialogue lines listed here, in order. Same set, same blocking, same characters as the rest "
+            "of the scene. "
+            + (f"The previous part ended on: «{say(lines[a - 1])}» — your first shot picks up right after it. " if a else
+               "This is the opening of the scene. ")
+            + (f"The next part starts with: «{say(lines[b])}» — end on a moment that leads into it." if b < len(lines) else
+               "This is the end of the scene."))
+        parts.append(part)
+    return parts
 
 
 def _top_rules(issues: list) -> list:

@@ -33,6 +33,56 @@ const EXACT: Record<string, Tr> = {
 }
 
 const PATTERNS: { re: RegExp; tr: (m: RegExpMatchArray) => Tr }[] = [
+  // 鏡頭卡上的接幀說明（services/continuity.py、routes/video.py 寫的中文）
+  {
+    re: /^✓ 接上 (\S+) 的末幀（鏈上第 (\d+)\/(\d+) 鏡）。$/,
+    tr: (m) => ({
+      zh: m.input ?? m[0],
+      en: `✓ Continues from the last frame of ${m[1]} (shot ${m[2]} of up to ${m[3]} in the chain).`,
+      ja: `✓ ${m[1]} の最後のフレームから続ける（つなぎ ${m[2]}／最大 ${m[3]} カット）。`,
+    }),
+  },
+  {
+    re: /^✓ 斷鏈鏡借 (\S+) 的末幀（同一組人、同一個人正面、已通過）。$/,
+    tr: (m) => ({
+      zh: m.input ?? m[0],
+      en: `✓ Not chained — borrows the last frame of ${m[1]} (same two people, same person facing the camera, already approved).`,
+      ja: `✓ つなぎなし — ${m[1]} の最後のフレームを借りる（同じ二人・同じ人が正面・採用済み）。`,
+    }),
+  },
+  {
+    // 生成前關卡（routes/video._preflight_gates）：規則說明是給導演模型看的英文，前綴照介面語言
+    re: /^(\S+) 沒過生成前關卡，先改分鏡再生：([\s\S]*)$/,
+    tr: (m) => ({
+      zh: m.input ?? m[0],
+      en: `${m[1]} didn't pass the pre-render checks — fix the shot first: ${m[2]}`,
+      ja: `${m[1]} は生成前のチェックを通らなかった。先に絵コンテを直してください：${m[2]}`,
+    }),
+  },
+  {
+    re: /^this plate was made before 2026-10-17 and has no saved prompt/,
+    tr: (m) => ({
+      zh: '這張空景是 10/17 改版前生的，沒有存提示詞，不能單張重生 —— 按「重新準備參考卡」整組重做。',
+      en: m.input ?? m[0],
+      ja: 'この空舞台は 10/17 以前に作られたもので、プロンプトが保存されていないため一枚だけ作り直せない —— 「参照カードを作り直す」で全体を作り直して。',
+    }),
+  },
+  {
+    re: /^上一鏡 (\S+) 還沒生成，這一鏡改用硬切。$/,
+    tr: (m) => ({
+      zh: m.input ?? m[0],
+      en: `${m[1]} hasn't been generated yet, so this shot starts fresh (hard cut).`,
+      ja: `${m[1]} がまだ生成されていないため、このカットは新しく始めます（カット切り替え）。`,
+    }),
+  },
+  {
+    re: /^接幀鏈已經連了 (\d+) 鏡/,
+    tr: (m) => ({
+      zh: m.input ?? m[0],
+      en: `The chain has reached ${m[1]} shots — this shot restarts from the character cards so the picture doesn't drift; the previous last frame is kept as a set reference.`,
+      ja: `つなぎが ${m[1]} カットに達したため、このカットはキャラクターカードから仕切り直します（画が流れないように）。前のカットの最後のフレームは場面の参考として使います。`,
+    }),
+  },
   {
     re: /^已經抽了 (\d+) 輪，花費 \$([\d.]+)。可以繼續，也可以回頭選前面幾輪的圖。$/,
     tr: (m) => ({
@@ -79,4 +129,27 @@ export function setUiLang(lang: Lang): void {
 }
 export function uiText(text: string): string {
   return sysText(text, current)
+}
+
+/**
+ * 內建範例的名稱（專案名、段落名）照介面語言顯示 —— 範例是附在安裝檔裡給所有人看的，
+ * 英文介面不該冒出「第10章 場景61」。只對照範例用到的名稱；使用者自己的專案名照原文。
+ */
+const SAMPLE_PREFIX: Record<string, Tr> = {
+  'Sample — ': { zh: '範例 — ', en: 'Sample — ', ja: 'サンプル — ' },
+}
+const SAMPLE_NAMES: Record<string, Tr> = {
+  '第10章 場景61': { zh: '第10章 場景61', en: 'Chapter 10, Scene 61', ja: '第10章 第61場' },
+}
+
+export function nameText(name: string | null | undefined, lang: Lang): string {
+  if (!name) return ''
+  let out = name
+  for (const [p, tr] of Object.entries(SAMPLE_PREFIX)) {
+    if (out.startsWith(p)) out = tr[lang] + out.slice(p.length)
+  }
+  for (const [n, tr] of Object.entries(SAMPLE_NAMES)) {
+    if (out.includes(n)) out = out.replace(n, tr[lang])
+  }
+  return out
 }

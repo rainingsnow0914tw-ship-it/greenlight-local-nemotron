@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -206,6 +207,24 @@ _TIME_MAP = {
 }
 
 
+def detect_language(text: str) -> str | None:
+    """數字元判斷劇本語言，不靠模型猜（欄位說明寫「例如 zh-TW」，模型就被例子帶走）。
+
+    第三世試跑：日文小說（漢字很多）被判成 zh-TW → 學語言模式原聲預設中文、旁白被寫成中文。
+    假名佔 CJK 字的 10% 以上＝日文（日文漢字再多，假名也遠超過這個比例）；有諺文＝韓文；拉丁字母佔多數＝英文。"""
+    kana = len(re.findall(r"[぀-ヿ]", text))
+    han = len(re.findall(r"[一-鿿]", text))
+    hangul = len(re.findall(r"[가-힯]", text))
+    latin = len(re.findall(r"[A-Za-z]", text))
+    if hangul > (han + kana) * 0.3:
+        return "ko"
+    if kana and kana >= (kana + han) * 0.1:
+        return "ja"
+    if latin > (han + kana + hangul) * 2:
+        return "en"
+    return "zh-TW" if han else None
+
+
 def parse(text: str, title_hint: str = "") -> tuple[Screenplay, dict[str, Any]]:
     """解析一份劇本。回傳 (Screenplay, 用量統計)。
 
@@ -294,7 +313,7 @@ def parse(text: str, title_hint: str = "") -> tuple[Screenplay, dict[str, Any]]:
         scenes=scenes,
         characters=characters,
         total_estimated_seconds=sum(s.estimated_screen_seconds for s in scenes),
-        language=parsed.language or "zh-TW",
+        language=detect_language(text) or parsed.language or "zh-TW",
         parse_warnings=parsed.warnings,
     )
 

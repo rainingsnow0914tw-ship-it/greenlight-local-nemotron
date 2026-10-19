@@ -10,11 +10,12 @@
  */
 
 import { Icon } from './Icons'
-import { sysText } from '../sysText'
+import { nameText, sysText } from '../sysText'
 import { useCallback, useEffect, useState } from 'react'
 import {
   api,
   segmentApi,
+  send,
   t,
   type AspectRatioOption,
   type Lang,
@@ -24,8 +25,10 @@ import {
   type Localized,
 } from '../api'
 import { DirectionPanel } from './DirectionPanel'
+import { ScenePanel } from './ScenePanel'
 import { LinesPanel } from './LinesPanel'
 import { FinishPanel } from './FinishPanel'
+import { AiText } from './AiText'
 import { ProductionPanel } from './ProductionPanel'
 import { PromptsPanel } from './PromptsPanel'
 import type { Copy } from '../i18n'
@@ -42,6 +45,12 @@ interface Props {
 
 // Lite 已下架；Omni Flash 是主力檔
 const TIER_ORDER = ['omni_flash_720p', 'fast_720p', 'standard_1080p']
+
+const FF = {
+  zh: { title: '首幀（可以用自己的圖）', note: '上傳一張自己做好的圖，這一鏡就從這張畫面開始（原圖照用，優先於接上一鏡）。', upload: '上傳首幀', clear: '不用了' },
+  en: { title: 'First frame (your own picture)', note: 'Upload a picture you made and this shot starts from it, used as is (it takes priority over chaining from the previous shot).', upload: 'Upload first frame', clear: 'Remove' },
+  ja: { title: '最初のフレーム（自分の画像も使える）', note: '自分で作った画像をアップロードすると、このカットはその画面から始まる（そのまま使用、前のカットからのつなぎより優先）。', upload: '最初のフレームをアップロード', clear: '使わない' },
+} as const
 
 export function SegmentView({
   copy,
@@ -79,6 +88,7 @@ export function SegmentView({
     }
   }
 
+  const [ffBump, setFfBump] = useState(0)   // 換過首幀就讓 <img> 重新抓
   const load = useCallback(async () => {
     try {
       const [s, r, est, f] = await Promise.all([
@@ -168,7 +178,7 @@ export function SegmentView({
       <p className="eyebrow">
         {copy.segments} {seg.order}
       </p>
-      <h1>{seg.title}</h1>
+      <h1>{nameText(seg.title, lang)}</h1>
 
       <div className="stats">
         <div>
@@ -421,7 +431,7 @@ export function SegmentView({
                       {Math.round(r.success_rate * 100)}%
                     </span>
                     <span className="risk-id">{r.shot_id}</span>
-                    <span className="risk-desc">{shot?.description}</span>
+                    <span className="risk-desc"><AiText text={shot?.description} lang={lang} projectId={projectId} /></span>
                   </div>
                   <ul className="risk-factors">
                     {r.risk_factors.map((f, i) => (
@@ -492,7 +502,7 @@ export function SegmentView({
                           : s.constraints.applied.length
                         : '—'}
                     </td>
-                    <td>{s.description}</td>
+                    <td><AiText text={s.description} lang={lang} projectId={projectId} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -508,6 +518,39 @@ export function SegmentView({
                   <div className="drawer-head">{openShot} · prompt</div>
                   {shot?.visual_prompt || copy.noPrompt}
                 </div>
+
+                {/* 自己的首幀：人物卡、空景、首幀都可以自己帶；有就原圖釘在第 0 格，優先於接幀 */}
+                {!projectId.startsWith('p-sample-') && (
+                  <div className="drawer">
+                    <div className="drawer-head">{FF[lang].title}</div>
+                    {shot?.user_first_frame && (
+                      <img src={`/api/projects/${projectId}/media/${shot.user_first_frame.split('/').pop()}/raw?b=${ffBump}`}
+                        alt="" style={{ maxWidth: 220, maxHeight: 220, borderRadius: 8, display: 'block', marginBottom: 8 }} />
+                    )}
+                    <p className="section-note">{FF[lang].note}</p>
+                    <div className="actions">
+                      <label className="btn small ghost">
+                        {FF[lang].upload}
+                        <input type="file" accept="image/*" hidden onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          const fd = new FormData()
+                          fd.append('file', f)
+                          void send(`/api/projects/${projectId}/segments/${order}/shots/${openShot}/first-frame`, { method: 'POST', body: fd })
+                            .then(async () => { setShots(await segmentApi.shots(projectId, order)); setFfBump((b) => b + 1) })
+                            .catch((err) => onError(err instanceof Error ? err.message : String(err)))
+                        }} />
+                      </label>
+                      {shot?.user_first_frame && (
+                        <button className="btn small ghost" onClick={() => {
+                          void send(`/api/projects/${projectId}/segments/${order}/shots/${openShot}/first-frame`, { method: 'DELETE' })
+                            .then(async () => setShots(await segmentApi.shots(projectId, order)))
+                            .catch((err) => onError(err instanceof Error ? err.message : String(err)))
+                        }}>{FF[lang].clear}</button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* 約束攤開來。在這之前這整段資料算了但沒出過 API ——
                     ConstraintPlan.skipped 的註釋寫著「要顯示出來，
@@ -594,6 +637,9 @@ export function SegmentView({
           onError={onError}
         />
       )}
+
+      {/* 選場景（本機 H3）：參考卡要在開拍前準備好 —— 沒有空景卡，沒首幀的鏡只能靠文字猜場景 */}
+      {shots && <ScenePanel lang={lang} projectId={projectId} order={order} />}
 
       {/* 第 7–9 關：試拍 → 批次 → 接片。放在提示詞之後 ——
           成本階梯就是這個順序，畫面順序要跟它一致。 */}

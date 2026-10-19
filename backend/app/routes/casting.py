@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from fastapi.responses import RedirectResponse
 
@@ -514,6 +516,41 @@ async def upload_identity(
     }
 
 
+@router.post("/{project_id}/casting/identity/use")
+def use_identity_as_is(project_id: str, character: str) -> dict:
+    """把上傳的那張圖原樣當成這個角色（不經模型重畫）。$0。
+
+    為什麼要有：上傳的圖原本只是「設計師的輸入」—— 照這張臉、依本片風格**重新設計**三個造型。
+    自己已經做好人物卡的人（另一套工具生的、自己畫的）要的是原圖照用（參考圖不能被我們的模型重畫，
+    要照使用者自己的）。這張變成一個候選、直接選定；之後的全身卡、臉卡也都用原圖（services/ref_jobs.py）。
+    """
+    from ..agents.character_designer import _slug
+    from ..schemas.casting import CastingRound, CharacterCandidate
+
+    def _commit(fresh):
+        gate = _ensure_gate(fresh)
+        session = _session_or_404(gate, character)
+        if session.identity_source != "uploaded" or not session.identity_reference_uri:
+            raise HTTPException(status_code=409, detail="先上傳這個角色的圖。")
+        n = len(session.rounds) + 1
+        cand = CharacterCandidate(candidate_id=f"{_slug(character)}-own{n}", character_name=character, round_number=n,
+                                  image_uri=session.identity_reference_uri, interpretation="你上傳的圖，原樣使用",
+                                  appearance_tags=session.source_description or "")
+        session.rounds.append(CastingRound(round_number=n, direction_id="own_image", direction_label="自己的圖",
+                                           candidates=[cand]))
+        casting.select(session, cand.candidate_id)
+        fresh.casting = gate
+        if gate.can_proceed and fresh.stage.order < Stage.CAST_LOCKED.order:   # 跟一般選定同一道閘門
+            fresh.stage = Stage.CAST_LOCKED
+        fresh.record_decision(choice=f"{character} 用自己上傳的圖當角色（原圖、不重畫）",
+                              rationale="使用者自備人物卡")
+        return fresh
+
+    new_state = project_store.get_store().mutate(project_id, _commit)
+    gate = new_state.casting
+    return {"session": _session_payload(gate.session_for(character), project_id), "gate": casting.gate_status(gate)}
+
+
 @router.delete("/{project_id}/casting/identity")
 def clear_identity(project_id: str, character: str) -> dict:
     """移除身份參考。$0。圖檔留在媒體庫（跟 unlock 同原則），只清掉指向。"""
@@ -576,4 +613,10 @@ def _context_excerpt(state, character_name: str, max_scenes: int = 4) -> str:
     picked = [
         s for s in screenplay.scenes if character_name in (s.characters_present or [])
     ][:max_scenes]
-    return "\n".join(f"・{s.action}" for s in picked if s.action)
+    summary = "\n".join(f"・{s.action}" for s in picked if s.action)
+    # 劇本原文裡提到這個角色的句子（最多 8 句、約 600 字）：場次摘要看不出「ぷく」是貓，
+    #    原文寫著「ぷくが『にゃあ』と鳴いた」「璃安はそれを抱き上げた」（第三世試跑：只給摘要，畫出三輪獸人）
+    text = getattr(state, "script_text", "") or ""
+    said = [x.strip() for x in re.split(r"(?<=[。！？!?\n])", text) if character_name in x and x.strip()][:8]
+    raw = "\n".join(f"・{x[:120]}" for x in said)
+    return "\n".join(p for p in (summary, f"（原文）\n{raw}" if raw else "") if p)

@@ -57,8 +57,16 @@ def critique(scene: dict, shots: list, call=None, model: str = None) -> dict:
         model = settings_store.load()["roles"]["critic"]["model"]       # 設定頁的製作人（預設 Nemotron Ultra）
     call = call or (lambda msgs: director.call_token_factory(msgs, model))
     brief = {k: scene.get(k) for k in ("title", "logline_en", "blocking", "events", "dialogue", "emotion_arc", "camera_intent")}
+    # 長場次切段導（services/direction.split_scene）：評審只評這一段。範例 3 第 2 場第 2 段：評審沒看到 part_note，
+    #    拿整場的 events 說「開場月音介紹 Lisa 沒拍」，導演照改 → 場中間冒出兩鏡「月音揮手歡迎 Lisa 走進來」
+    part = ""
+    if scene.get("part_note"):
+        brief["part_note"] = scene["part_note"]
+        part = ("\n\nIMPORTANT — this is only ONE PART of a longer scene (see part_note). Judge only the dialogue lines "
+                "listed here. Events, beats and the emotion_arc outside these lines belong to the other parts: do NOT ask "
+                "for them, and never ask for an opening/introduction unless part_note says this is the opening.")
     messages = [{"role": "system", "content": system_prompt()},
-                {"role": "user", "content": "The scene:\n" + json.dumps(brief, ensure_ascii=False, indent=1)
+                {"role": "user", "content": "The scene:\n" + json.dumps(brief, ensure_ascii=False, indent=1) + part
                  + "\n\nThe director's shot list:\n" + json.dumps(compact(shots), ensure_ascii=False, indent=1)
                  # 角色要在最後再講一次：實測 Ultra 看完一份分鏡，直接「自己重導一遍」回了一份新分鏡
                  #（還編了劇本沒有的台詞），而不是給意見。評審只評、不寫。

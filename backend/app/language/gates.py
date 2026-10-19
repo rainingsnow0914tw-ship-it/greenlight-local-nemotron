@@ -121,6 +121,19 @@ def _dict_readings(spoken: str) -> dict[int, tuple[str, str]]:
             reading = hira[: len(hira) - len(m.group(2))] if m.group(2) else hira
             if reading:
                 out[pos] = (m.group(1), reading, bool(m.group(2)))   # 第三格：有沒有送假名
+        elif hira and re.fullmatch(r"(?:" + _KANJI + r"+[ぁ-ゖ]+)+" + _KANJI + r"*[ぁ-ゖ]*", orig):
+            # 漢字、假名交錯的一個詞（立ち上がっ、引き出し）：每段漢字各自對讀音，中間的假名當錨點
+            #   範例 3：「立ち上がった」整個詞字典有讀音，舊寫法只收「漢字串＋送假名」→ 沒補、關卡報「上立沒標讀音」
+            segs = re.findall(_KANJI + r"+|[ぁ-ゖ]+", orig)
+            pat = "".join("(.+?)" if re.fullmatch(_KANJI + "+", s) else re.escape(s) for s in segs)
+            mm = re.fullmatch(pat, hira)
+            if mm:
+                at, g = pos, 1
+                for s in segs:
+                    if re.fullmatch(_KANJI + "+", s):
+                        out[at] = (s, mm.group(g), True)
+                        g += 1
+                    at += len(s)
         pos += len(orig)
     return out
 
@@ -128,6 +141,17 @@ def _dict_readings(spoken: str) -> dict[int, tuple[str, str]]:
 def ja_punct(ruby: str) -> str:
     """日文台詞裡的中文全形逗號換成読点（實測：中文劇本改寫時模型常把「，」帶過來）。"""
     return (ruby or "").replace("，", "、")
+
+
+def name_ruby(ruby: str, name_say: dict[str, str] | None) -> str:
+    """名字的讀音一律照名字表（範例 2：字典把「月音」補成つきおと，名字表寫的是つきね）。
+    名字被拆成一個字一個字標也認得（月[つき]音[おと] → 月音[つきね]）。只處理有漢字的名字。"""
+    for name, say in (name_say or {}).items():
+        if not name or not say or not re.search(_KANJI, name):
+            continue
+        pat = "".join(re.escape(ch) + r"(?:\[[^\]]*\])?" for ch in name)
+        ruby = re.sub(pat, lambda m: f"{name}[{say}]", ruby or "")
+    return ruby
 
 
 def fill_ruby(ruby: str) -> tuple[str, list[str]]:
@@ -247,6 +271,113 @@ def check_notes(notes: list[dict], explain: str) -> list[dict]:
     return out
 
 
+# 中文劇本改寫成日文時漏翻的字：繁體中文才有、日文不用的字形（日文是 们→×、这→×、说→説、为→為…）
+#    幕後第 1 集：台詞導演留下「不用。」「導演？」—— H3 照中文唸。這些字一出現就一定是漏翻
+# 第一人稱分組：同一組是同一個自稱的不同寫法（自稱私的人寫わたし不算錯）
+_FIRST_PERSON = (("僕", "ぼく"), ("俺", "おれ"), ("私", "わたし", "わたくし"), ("あたし",))
+
+
+def other_first_person(spoken: str, mine: str) -> list[str]:
+    """台詞裡出現了、但不是這個人自稱（mine，例如「僕」）的第一人稱。
+
+    後面接たち／ら＝複數（僕ら）還是同一個自稱；おれい（お礼）、おれる（折れる）不是人稱。
+    對照組：幕後短片 24 集人工翻譯 609 句，0 誤報（開工.py 檢查）。
+    """
+    return [w for grp in _FIRST_PERSON if not any(x in mine for x in grp)
+            for w in grp if re.search(w + r"(?!たち|ら|達|い|る|た)", spoken)]
+_ZH_ONLY_CHARS = set("們這麼還說為覺讚樣歡較會來對從點裡畫與學氣嗎呢吧啊喔哦嘛")
+# 字形日文也有、但這個詞日文不這樣講（字典切得出來，所以要列）
+_ZH_ONLY_WORDS = ("不用", "沒有", "什麼", "怎麼", "我們", "你們", "他們", "這樣", "那樣", "還是", "就是", "導演",
+                  "劇本", "分鏡", "提示詞", "按讚", "訂閱", "翻車", "筆電", "影片", "已經", "覺得", "東西",
+                  "結尾", "開頭")   # 範例 3「結尾の絵」：字典認得（罕用），舊判法放過
+
+
+def untranslated_zh(spoken: str, source: str) -> list[str]:
+    """日文台詞裡從中文原句直接抄過來、日文不這樣講的字或詞（空＝沒有）。"""
+    hits = sorted({c for c in spoken if c in _ZH_ONLY_CHARS and c in source})
+    hits += [w for w in _ZH_ONLY_WORDS if w in spoken and w in source]
+    # 字典查不到讀音的漢字串、又是原句裡一字不差的（導演 → 導／演(讀音空)）
+    global _tagger
+    try:
+        import fugashi
+        if _tagger is None:
+            _tagger = fugashi.Tagger()
+        for m in re.finditer(_KANJI + "{2,}", spoken):
+            run = m.group(0)
+            if run in source and run not in hits and any(not w.feature.kana for w in _tagger(run)):
+                hits.append(run)
+    except ImportError:
+        pass
+    return hits
+
+
+# 動詞的連用形後面直接接這些輔助動詞，中間一定要有「て」（当ててみて，不是当てみて）
+_TE_AUX = {"見る", "居る", "仕舞う", "呉れる", "貰う"}
+
+
+def broken_grammar(spoken: str) -> list[str]:
+    """日文台詞裡字典判得出來的活用錯誤（空＝沒有）。只抓三種、一定錯的接法：
+      連用形＋ね（来ね → 来たね）、連體形＋動詞（数える直さ → 数え直さ）、
+      連用形＋みる／いる／しまう／くれる／もらう 少了て（当てみて → 当ててみて）。
+    幕後第 1 集台詞導演第三次重跑，這三句模型自己檢查都說沒問題。
+    前面有「お／ご」的不算（お休みもらえる：休み是名詞）。
+    對照組：幕後短片人工翻譯＋第三世字幕 950 句，0 誤報。"""
+    global _tagger
+    try:
+        import fugashi
+    except ImportError:
+        return []
+    if _tagger is None:
+        _tagger = fugashi.Tagger()
+    ws = list(_tagger(spoken))
+    out = []
+    for i, (a, b) in enumerate(zip(ws, ws[1:])):
+        fa, fb = a.feature, b.feature
+        if fa.pos1 != "動詞" or not fa.cForm or (i and ws[i - 1].feature.pos1 == "接頭辞"):
+            continue
+        if ((fa.cForm.startswith("連用形") and fb.pos2 == "終助詞" and b.surface == "ね")
+                or (fa.cForm.startswith("連体形") and fb.pos1 == "動詞")
+                or (fa.cForm.startswith("連用形") and fb.pos1 == "動詞" and fb.pos2 == "非自立可能" and fb.lemma in _TE_AUX)):
+            out.append(a.surface + b.surface)
+    return out
+
+
+def swallowed_okurigana(ruby: str, names=()) -> list[str]:
+    """「漢字[讀音]」後面接著假名，讀音卻把送假名也寫進去了 → 去掉讀音後的原字少一個假名、H3 照字唸錯。
+    幕後第 1 集：「決[きめ]る」→ 原字「決る」，H3 唸成「蹴る」；「成[なっ]た」→「成た」。
+    判法：字典把「漢字＋後面的假名」讀出來，跟「讀音＋那些假名」不一樣，就是寫錯（名字不管）。"""
+    global _tagger
+    try:
+        import fugashi
+    except ImportError:
+        return []
+    if _tagger is None:
+        _tagger = fugashi.Tagger()
+    spoken = strip_ruby(ruby)
+    hira = lambda k: "".join(chr(ord(c) - 0x60) if "ァ" <= c <= "ヶ" else c for c in (k or ""))  # noqa: E731
+    # 整句切一次，記下每個詞從哪裡開始：只檢查「從這個漢字開始的詞」。
+    #    逐字標的（間[まち]違[が]えた、生[せい]成[せい]）中間那個字不是詞頭，從它切會讀成別的詞 → 誤報三句
+    starts, at = {}, 0
+    for w in _tagger(spoken):
+        starts[at] = (w.surface, hira(w.feature.kana), w.feature.pos1)
+        at += len(w.surface)
+    out, pos = [], 0
+    for base, rb in tokens(ruby):
+        numeric = base[0] in "一二三四五六七八九十百千万零〇何幾"   # 數量詞（八[やっ]つ、一[ひと]つ）讀音本來就不照字典
+        word = starts.get(pos)
+        after = spoken[pos + len(base):]
+        if rb and word and re.fullmatch(_KANJI + "+", base) and base not in names and not numeric                 and word[0].startswith(base) and re.match(r"[ぁ-ゖ]", after):
+            surface, want, pos1 = word
+            covered = surface[len(base):]
+            # 字典把「言う」讀成ゆう（口語音），いう才是寫法 → 視為相同（對照組誤報）
+            if covered and re.fullmatch(r"[ぁ-ゖ]+", covered) and want and want != rb + covered                     and want.replace("ゆう", "いう") != rb + covered:
+                out.append(f"{base}[{rb}]{covered}（字典：{want}）")
+            elif not covered and want and want != rb and pos1 == "名詞" and rb.endswith("っ"):
+                out.append(f"{base}[{rb}]（{base}單獨是名詞「{want}」，這裡應該寫假名）")
+        pos += len(base)
+    return out
+
+
 def check(lines: list[dict], replies: list[dict], film: str, learners: list[str],
           people: dict[str, str] | None = None, en_names: dict[str, str] | None = None,
           name_say: dict[str, str] | None = None) -> list[dict]:
@@ -283,6 +414,11 @@ def check(lines: list[dict], replies: list[dict], film: str, learners: list[str]
         if "[" in spoken or "]" in spoken:   # 讀音標在假名上（違う[ちがう]、の[の]）→ 去不掉、會被唸出來
             add(lid, "ERROR", "ruby", "readings go on kanji only — remove brackets after kana (違[ちが]う, not 違う[ちがう])",
                 "讀音標在假名上（去不掉，會被當成台詞）")
+        plain = ja_punct((r.get("spoken") or "").strip()) if film == "ja" else (r.get("spoken") or "").strip()
+        if plain and "[" in ruby and spoken.strip() != plain:
+            add(lid, "ERROR", "ruby_copy", f"adding readings changed the words: spoken is \"{plain}\" but ruby without brackets is "
+                f"\"{spoken}\" — copy `spoken` exactly and only add [よみ] after kanji (選[えら]ぶ, not 選[え]らぶ)",
+                f"加讀音時把字改掉了：「{plain}」→「{spoken}」")
         if learners and r.get("why") and not in_language(r["why"], learners[0]):
             add(lid, "ERROR", "explain", f"'why' must be written in {LANG_NAME.get(learners[0], learners[0])} for the learner",
                 "「為什麼這樣說」不是用學習者的語言寫的")
@@ -300,7 +436,11 @@ def check(lines: list[dict], replies: list[dict], film: str, learners: list[str]
         for name in people:
             said = (name_say or {}).get(name)
             kept = name in spoken or (said and said in spoken)
-            if re.search(r"[一-鿿]", name) and name in src and not kept and film in ("ja", "zh"):
+            if people[name].startswith("a term") and name in src and not kept and said:
+                # 名字表裡的用語（jobs.people）：照表上的譯法
+                add(lid, "ERROR", "terms", f"the glossary says {name} is said as {said} — use {said}",
+                    f"用語「{name}」要照名字表寫成「{said}」")
+            elif re.search(r"[一-鿿]", name) and name in src and not kept and film in ("ja", "zh"):
                 add(lid, "ERROR", "names", f"keep the name {name} as a name (write it as {name}"
                     + ("[reading]" if film == "ja" else "") + (f" or {said}" if said else "")
                     + "), never translate its meaning", f"名字「{name}」被改掉了")
@@ -311,12 +451,36 @@ def check(lines: list[dict], replies: list[dict], film: str, learners: list[str]
             if stray:
                 add(lid, "ERROR", "foreign", f"foreign words in a {LANG_NAME[film]} line: {', '.join(stray)} — say it in {LANG_NAME[film]}",
                     f"台詞裡混了外文：{'、'.join(stray)}")
+        if film == "ja":
+            zh = untranslated_zh(spoken, src)
+            if zh:
+                add(lid, "ERROR", "untranslated", f"Chinese left in the Japanese line: {', '.join(zh)} — say it in Japanese "
+                    "(e.g. 不用 → いらない／書かなくていい, 導演 → 監督)", f"日文台詞裡夾了沒翻的中文：{'、'.join(zh)}")
+            gram = broken_grammar(spoken)
+            if gram:
+                add(lid, "ERROR", "grammar", f"this does not conjugate correctly in Japanese: {', '.join(gram)} — fix the verb form "
+                    "(e.g. 来ね → 来たね, 当てみて → 当ててみて, 数える直す → 数え直す)", f"日文活用接錯了：{'、'.join(gram)}")
+            bad = swallowed_okurigana(ruby, tuple(people))
+            if bad:
+                add(lid, "ERROR", "okurigana", "the reading swallowed the kana after it, so the spoken text is wrong: "
+                    + ", ".join(bad) + " — put only the kanji's own reading in the brackets (決[き]める, なった in kana)",
+                    "讀音把後面的送假名吃掉了，原字會唸錯：" + "、".join(bad))
         # 英文字幕的名字照名字表（深息＝Shenxi，第二世英文版正典；模型自己會拼成 ShinSoku）
         en_sub = (r.get("subs") or {}).get("en") or ""
+        # 連字號各種寫法視為同一個（模型寫 open‑source 用的是不斷行連字號 U+2011，肉眼跟 - 一樣，
+        #    模型看不出差在哪，連改四輪都過不了）
+        dash = lambda x: re.sub(r"[‐-―−]", "-", x).lower()
         for name, en in (en_names or {}).items():
-            if "en" in learners and name in src and en_sub and en.lower() not in en_sub.lower():
+            if "en" in learners and name in src and en_sub and dash(en) not in dash(en_sub):
                 add(lid, "ERROR", "names", f"in the English subtitle, write the name {name} as {en}", f"英文字幕的「{name}」要寫成 {en}")
         speaker = want[lid].get("speaker") or ""
+        # 名字表寫了「自稱X」（jobs.personas）→ 這個人的台詞不能出現別的第一人稱（深息自稱僕，重跑一次就變回私）
+        own = re.search(r"自[稱称]\s*([^\s，,。;；]+)", people.get(speaker, ""))
+        if film == "ja" and own:
+            others = other_first_person(spoken, own.group(1))
+            if others:
+                add(lid, "ERROR", "persona", f"{speaker} calls themself {own.group(1)} (cast list) — not {'/'.join(others)}",
+                    f"{speaker}的自稱是「{own.group(1)}」，台詞卻用了「{'、'.join(others)}」")
         if film == "ja" and re.search(r"\b(woman|girl|female)\b", people.get(speaker, "")) and re.search(r"俺|お前|てめえ|貴様", spoken):
             add(lid, "ERROR", "persona", f"{speaker} is a woman ({people[speaker]}): 俺／お前 is rough male speech — "
                 "use わたし／あたし and あなた／名前 unless she truly talks like that", "女性角色用了男性粗口（俺／お前）")

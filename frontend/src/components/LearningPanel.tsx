@@ -60,6 +60,11 @@ const COPY: Record<string, Localized> = {
   records: { zh: '筆生成紀錄', en: 'generation records', ja: '件の生成記録' },
   firstPass: { zh: '一次過關率', en: 'First-pass rate', ja: '一発OK率' },
   rejected: { zh: '被打回重拍', en: 'Reshoots', ja: '撮り直し' },
+  sampleFinal: {
+    zh: '這支範例：{n} 鏡全部收下（作者做好的最終版）。',
+    en: 'This sample: all {n} shots accepted (the author’s finished cut).',
+    ja: 'このサンプル：{n} カットすべて採用（作者が仕上げた最終版）。',
+  },
   shots: { zh: '涵蓋鏡頭', en: 'Distinct shots', ja: 'カット数' },
   notesTitle: { zh: '系統提煉出的規律', en: 'What the system has learned', ja: 'システムが学んだこと' },
   notesMeta: { zh: '基於 {n} 筆實測 · {date}', en: 'From {n} observations · {date}', ja: '{n} 件の実測より · {date}' },
@@ -188,7 +193,11 @@ export function LearningPanel({
 
       {!data.connected && <div className="notice warn">{t(COPY.degraded, lang)}</div>}
 
-      {data.connected && (
+      {data.sample_final && (
+        <div className="notice">{fill(t(COPY.sampleFinal, lang), { n: data.sample_final.accepted })}</div>
+      )}
+
+      {data.connected && !data.sample_final && (
         <div className="stats">
           <div>
             <div className="stat-label">{t(COPY.firstPass, lang)}</div>
@@ -212,7 +221,7 @@ export function LearningPanel({
       {/* 舉證用：
           上面那些統計是系統的宣稱，這裡是原始資料 ——
           帶時間戳、鏡號、模型 id、實際花費與延遲的原始列編不出來。 */}
-      {data.connected && (
+      {data.connected && !data.sample_final && (
         <div style={{ margin: '18px 0' }}>
           <button className="btn" onClick={() => void openRecords()} disabled={loadingRows}>
             {loadingRows

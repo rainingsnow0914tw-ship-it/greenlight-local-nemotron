@@ -17,7 +17,7 @@
 
 import { Icon } from './Icons'
 import { AiText } from './AiText'
-import { sysText } from '../sysText'
+import { nameText, sysText } from '../sysText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   castingApi,
@@ -196,6 +196,9 @@ export function CastingView({ copy, lang, projectId, onError, onGateChange }: Pr
 
       {session && (
         <CharacterPanel
+          // 每個角色一個 key：換角色時面板重新開始（「我有權使用這張圖片」不會從上一個角色帶過來 —— 範例 3
+          //   換到 Lisa 時已經勾著，再點一下反而取消）
+          key={session.character_name}
           copy={copy}
           lang={lang}
           projectId={projectId}
@@ -237,6 +240,11 @@ export function CastingView({ copy, lang, projectId, onError, onGateChange }: Pr
           onClearIdentity={() =>
             run(session.character_name, () =>
               castingApi.clearIdentity(projectId, session.character_name),
+            )
+          }
+          onUseIdentity={() =>
+            run(session.character_name, () =>
+              castingApi.useIdentity(projectId, session.character_name),
             )
           }
           onGenerateFromIdentity={() => {
@@ -283,6 +291,7 @@ interface PanelProps {
   onClearIdentity: () => void
   /** 用身份參考（臉）重生角色卡：已鎖定就先解鎖再生（上傳新臉＝要換人） */
   onGenerateFromIdentity: () => void
+  onUseIdentity: () => void
 }
 
 function CharacterPanel({
@@ -305,6 +314,7 @@ function CharacterPanel({
   onLookSegment,
   onUploadIdentity,
   onClearIdentity,
+  onUseIdentity,
   onGenerateFromIdentity,
 }: PanelProps) {
   const lookMode = lookSegment != null
@@ -333,6 +343,15 @@ function CharacterPanel({
   // 上傳身份參考：勾了免責才收檔（後端也擋）。file input 是「零輸入」原則下唯一允許的輸入。
   const [consent, setConsent] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
+  // 上傳完把「生成角色卡／直接用這張」捲到眼前（範例 3：按鈕在第一屏下面，傳完看不到下一步）
+  const nextRef = useRef<HTMLDivElement | null>(null)
+  const lastFace = useRef(session.identity_reference_url)
+  useEffect(() => {
+    if (session.identity_source === 'uploaded' && session.identity_reference_url && session.identity_reference_url !== lastFace.current) {
+      nextRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    lastFace.current = session.identity_reference_url
+  }, [session.identity_reference_url, session.identity_source])
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   return (
@@ -384,7 +403,7 @@ function CharacterPanel({
           </div>
         </div>
         {session.identity_source === 'uploaded' && (
-          <div className="identity-generate">
+          <div className="identity-generate" ref={nextRef}>
             <button
               className="btn primary"
               onClick={onGenerateFromIdentity}
@@ -393,6 +412,10 @@ function CharacterPanel({
               {busy ? copy.castingGenerating : copy.identityGenerate}
               <span className="price">${roundCost.toFixed(2)} · {perRound}</span>
             </button>
+            <button className="btn ghost" onClick={onUseIdentity} disabled={busy} title={copy.identityUseAsIsNote}>
+              {copy.identityUseAsIs}
+            </button>
+            <p className="section-note">{copy.identityUseAsIsNote}</p>
             {session.is_locked && (
               <p className="identity-hint">{copy.identityGenerateUnlockNote}</p>
             )}
@@ -447,7 +470,7 @@ function CharacterPanel({
                   key={seg.order}
                   className={`btn chip${lookSegment === seg.order ? ' on' : ''}${has ? ' has-look' : ''}`}
                   onClick={() => onLookSegment(seg.order)}
-                  title={seg.title}
+                  title={nameText(seg.title, lang)}
                 >
                   {fmt(copy.lookModeSegment, seg.order)}
                   {has ? ' ✓' : ''}

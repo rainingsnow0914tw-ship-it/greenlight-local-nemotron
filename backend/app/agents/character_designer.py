@@ -277,9 +277,9 @@ def _user_prompt(
     count = int(config_loader.casting().get("candidates_per_round", 3))
 
     kind_note = (
-        "這是一個**沒有實體身體**的角色（AI／系統／抽象存在）。"
-        "要給它一個在劇中說得通的視覺形體 —— 想想它如何被感知，"
-        "不要偷懶畫成人形機器人。"
+        "這不是人類。先從劇本語境判斷它**是什麼**：會叫、會被抱起來、坐在腳邊＝動物（照那種動物畫，"
+        "不要擬人、不要人形身體）；AI／系統／程式＝沒有實體，才給它一個在劇中說得通的視覺形體。"
+        "劇本寫了是什麼就畫什麼，不要把動物畫成精靈或獸人，也不要偷懶把 AI 畫成人形機器人。"
         if session.kind is CharacterKind.NON_HUMAN
         else "這是一個有血有肉的人物。"
     )
@@ -505,15 +505,23 @@ def design_round(
                 # 本機 Qwen-Image 2512（$0）。圖照專案比例（同下面 Google 那條的理由）。
                 from ..engines import local_image
 
-                data, mime, _info = local_image.generate(
-                    prompt,
-                    aspect=(
-                        project_aspect
-                        if ref_cfg.get("aspect_ratio", "follow_project") == "follow_project"
-                        else ref_cfg.get("aspect_ratio")
-                    ),
-                    prefix=f"greenlight/{project_id}/{candidate_id}",
-                )
+                aspect = (project_aspect if ref_cfg.get("aspect_ratio", "follow_project") == "follow_project"
+                          else ref_cfg.get("aspect_ratio"))
+                if identity_image:
+                    # 有上傳的臉 → 照圖改（Qwen-Image-Edit），不是只看文字重畫：幕後第 1 集，
+                    #    三個角色都上傳了自己的人物卡，生出來的候選一個都不像（紅色短髮戴眼鏡的 Lisa 變黑長髮）
+                    import tempfile
+
+                    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                        tmp.write(identity_image[0])
+                    try:
+                        data, mime, _info = local_image.edit([tmp.name], prompt, aspect=aspect,
+                                                             prefix=f"greenlight/{project_id}/{candidate_id}")
+                    finally:
+                        os.unlink(tmp.name)
+                else:
+                    data, mime, _info = local_image.generate(prompt, aspect=aspect,
+                                                             prefix=f"greenlight/{project_id}/{candidate_id}")
                 cost_each = 0.0
             else:
                 # 節流 + 重試（實測必要）：

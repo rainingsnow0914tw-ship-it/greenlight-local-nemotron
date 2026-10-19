@@ -203,6 +203,8 @@ def learning_overview() -> dict:
         "spent_usd": stats.get("spent_usd", 0.0),
         "refined_notes": notes,
         "refine_threshold": refinery.MIN_SAMPLES_TO_REFINE,
+        # 首頁不是範例：欄位要跟專案頁 /learning 一樣（前端共用同一個組件；verify_wiring「首頁欄位不缺」）
+        "sample_final": None,
     }
 
 

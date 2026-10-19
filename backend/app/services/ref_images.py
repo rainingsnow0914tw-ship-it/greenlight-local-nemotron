@@ -1,6 +1,6 @@
 """參考圖：全身卡、場景空景、首幀 —— 本機影片引擎（H3）要的圖，在使用者自己的 ComfyUI 上生。
 
-為什麼要有這一層（場景與真人的參考圖，生法跟動畫不一樣）：
+為什麼要有這一層（提示詞和場景寫好之後，參考圖要怎麼生；真人和動畫的邏輯不一樣）：
 本機 H3 可以吃參考圖（提示詞寫「就是參考圖 <Picture N> 裡的那個人／地方」，長相與擺設交給圖），
 但使用者自己的專案沒有人做這些圖。這裡把它們做出來，三條規矩：
 
@@ -25,9 +25,31 @@ FULL_BODY_INSTRUCTION = (
     "Keep the face, hairstyle and top exactly the same, and complete the outfit below the waist in a matching style. "
     "Plain light grey seamless studio background, soft even lighting."
 )
+# 非人角色（動物、AI、精靈）：上面那句寫死「人、鞋子、補下半身衣服」—— 第三世試跑，選角選好的小貓ぷく
+#    做全身卡時被畫成穿衣服、兩腳站的貓人。改成「保持它原本的物種與樣子」。
+#    同日：機器人塔列昂照「保持物種」被畫成條紋貓人（盔甲不見）→ 補「材質」與「機器保持機器」。
+NON_HUMAN_FULL_BODY_INSTRUCTION = (
+    "Show the same creature or entity from image 1 with its whole body visible, in its own natural form and pose. "
+    "Keep its species, body shape, size, markings, colours and materials exactly. If it is an animal it stays a real animal — "
+    "in its natural animal posture, no clothes, no human body, no standing upright like a person. "
+    "If it is a robot, machine or armoured being it stays exactly that — the same metal plates, armour and lights, "
+    "never turned into fur or skin. "
+    "Plain light grey seamless studio background, soft even lighting."
+)
+# 臉卡：選角那張原圖帶著背景（選角構圖刻意要「符合角色世界的氛圍背景」）—— 第三世試跑，
+#    臉卡是森林背景，送進 H3 之後第 1 場「核心處理器」整鏡變成森林裡（空景卡明明是機房）。
+#    臉卡只該管臉：同一張臉、同樣髮型與衣服，背景換成素色（跟全身卡同一種背景）。
+FACE_CARD_INSTRUCTION = (
+    "Show the same character from image 1, head and shoulders, facing the camera. "
+    "Keep the face, hairstyle, colours and clothing exactly the same. "
+    "Replace the background with a plain light grey seamless studio background, soft even lighting. Nothing else in the picture."
+)
 PLATE_HEAD = "An empty room with nobody in it — an architectural interior photograph."
 PLATE_TAIL = ("Empty set: no people, no figures, no silhouettes, no reflections of people in mirrors or glass. "
               "Wide establishing view, everything in focus.")
+PLATE_TAIL_NEAR = ("Empty set: no people, no figures, no silhouettes, no reflections of people in mirrors or glass. "
+                   "Medium framing: only this section of the wall fills the frame, as the background behind someone "
+                   "standing chest-up in front of it; everything in focus.")
 # 每一份首幀指示後面都由程式補上（不靠寫指示的 AI 記得 —— 它看不到空景，不知道房間裡有鏡子、門在哪）。
 # 實際抓過兩次：①Lisa 站在一扇空景沒有的門裡 ②鏡子照得到門、照不到站在門前的人。
 PHYSICS_TAIL = (
@@ -46,21 +68,27 @@ class _Plate(BaseModel):
 
 
 class _PlateViews(BaseModel):
-    room_en: str = Field(description=(
-        "One paragraph describing the EMPTY room once: size, materials, colours, light for the time of day, and every "
-        "fixture with its position (which wall). Reused word for word for both views, so be concrete (tile size and "
-        "colour, door material, mirror size). Furniture and fixtures only — never people, bodies, actions or verbs "
-        "of doing (no 'splashing', 'standing', 'walking')."))
+    materials_en: str = Field(description=(
+        "The room's finishes only, shared by every view: wall colour and tiles, floor, ceiling, light for the time of "
+        "day. NO fixtures and NO positions here (no sinks, doors, mirrors, beds) — those belong to one wall only."))
     wall_a_en: str = Field(description=(
         "The wall view A faces, named by its fixtures, e.g. 'the wall with the sinks and the long mirror'. "
         "Pick the side the action mostly plays toward."))
     visible_a_en: str = Field(description=(
-        "What view A shows, left to right, near to far — fixtures only, no people, no actions."))
+        "What a wide shot facing wall A shows, left to right — ONLY that wall and what stands against it. Do not "
+        "mention anything on the opposite wall."))
+    near_a_en: str = Field(description=(
+        "What is right behind a person who stands in the middle of the room with wall A behind them, framed chest-up: "
+        "the middle section of wall A only (two or three fixtures at most)."))
     wall_b_en: str = Field(description=(
-        "The wall DIRECTLY OPPOSITE wall A (the camera has turned around 180 degrees), named by its fixtures."))
+        "The wall DIRECTLY OPPOSITE wall A (the camera has turned around 180 degrees), named by its fixtures. "
+        "It must have different fixtures from wall A — a reverse shot that shows the same fixtures is useless."))
     visible_b_en: str = Field(description=(
-        "What view B shows, left to right, near to far — fixtures only, no people, no actions. Things that were on "
-        "the left in view A are now on the right."))
+        "What a wide shot facing wall B shows, left to right — ONLY that wall. None of wall A's fixtures appear."))
+    near_b_en: str = Field(description="Like near_a_en, for wall B: the middle section of wall B only.")
+    backs_to_a: list[str] = Field(description=(
+        "From the blocking: the names of the people who have wall A BEHIND them when they face the camera "
+        "(they look toward wall B). Everyone else in the scene has wall B behind them."))
 
 
 # 空景描述裡出現這些字 ＝ 寫進了人或動作，生圖模型會照畫（實測：寫了洗臉，兩張空景都多一個人在洗臉）
@@ -70,11 +98,13 @@ _PEOPLE_WORDS = re.compile(
 
 
 def plate_views(dscene: dict, location_key: str, style_prefix: str) -> tuple[dict[str, dict], dict]:
-    """正反打兩張空景的提示詞：{view_id: {"faces_en", "prompt"}}。
+    """正反打空景的提示詞：{view_id: {"faces_en", "prompt"}}，view_id ＝ A／A_near／B／B_near；另回 "_backs_to_a"。
 
     換機位一律用文字整段重生，不拿另一個機位的圖去改（本機管線的規矩：`--ref` 只能給同一個機位的圖；
     實測兩次——拿正打空景叫修圖模型轉 180 度或轉 90 度，它只會左右翻轉或照原構圖，連門都弄丟）。
-    同一間房的一致性靠「同一段房間描述」：兩張提示詞共用 room_en，只差鏡頭朝哪邊、看得到什麼。
+    🔴 改：兩張共用的只留材質與光線，設施只寫在它那一面。舊版兩張都放完整房間描述（含每面牆的設施），
+    千問照描述畫、忽略「鏡頭轉向對面」—— 第 61 場 A／B 是同一個角落（相關係數 0.447；正式管線真正反打 0.13～0.18）。
+    遠（A、B）給全景、中景；近（A_near、B_near）＝同一面牆中間那段，給中近景、特寫（正式管線：挑機位最貼近這一鏡構圖的空景）。
     """
     loc = (dscene.get("locations") or {}).get(location_key, location_key)
     user = (f"Location: {loc}\nTime of day: {dscene.get('time', '')}\n"
@@ -84,7 +114,7 @@ def plate_views(dscene: dict, location_key: str, style_prefix: str) -> tuple[dic
     system = "You are a production designer planning shot / reverse-shot coverage of one empty film set."
     pv, usage = _ask("場面調度", system, user, _PlateViews)
     # 關卡：描述裡有人或動作的字眼 → 退回重寫一次；還有就不送（寧可停下來，不要生一張有人的空景）
-    texts = lambda p: " ".join((p.room_en, p.visible_a_en, p.visible_b_en))  # noqa: E731
+    texts = lambda p: " ".join((p.materials_en, p.visible_a_en, p.visible_b_en, p.near_a_en, p.near_b_en))  # noqa: E731
     hits = sorted({m.lower() for m in _PEOPLE_WORDS.findall(texts(pv))})
     if hits:
         pv, u2 = _ask("場面調度", system, user + f"\n\nYour previous draft mentioned people or actions ({', '.join(hits)}). "
@@ -94,50 +124,90 @@ def plate_views(dscene: dict, location_key: str, style_prefix: str) -> tuple[dic
         if hits:
             raise ValueError(f"empty-set description still mentions people or actions {hits} — not generating it")
     out = {}
-    for vid, wall, visible in (("A", pv.wall_a_en, pv.visible_a_en), ("B", pv.wall_b_en, pv.visible_b_en)):
+    other = {"A": pv.wall_b_en.strip(), "B": pv.wall_a_en.strip()}
+    for vid, wall, visible, near in (("A", pv.wall_a_en, pv.visible_a_en, pv.near_a_en),
+                                     ("B", pv.wall_b_en, pv.visible_b_en, pv.near_b_en)):
         # 「空房間、沒有人」放最前面：模型對前段服從度最高（原版 character_designer 的實測），放最後壓不住
-        prompt = " ".join(p for p in (PLATE_HEAD, style_prefix.strip(), "The room:", pv.room_en.strip(),
-                                      f"The camera faces {wall.strip()}.", visible.strip(), PLATE_TAIL) if p)
-        out[vid] = {"faces_en": wall.strip(), "prompt": prompt}
+        back = f"The camera has its back to {other[vid]}, so none of that is in view."
+        wide = " ".join(p for p in (PLATE_HEAD, style_prefix.strip(), "Finishes:", pv.materials_en.strip(),
+                                    f"The camera faces {wall.strip()}.", back, visible.strip(), PLATE_TAIL) if p)
+        close = " ".join(p for p in (PLATE_HEAD, style_prefix.strip(), "Finishes:", pv.materials_en.strip(),
+                                     f"A chest-high medium shot facing {wall.strip()}.", back, near.strip(), PLATE_TAIL_NEAR) if p)
+        out[vid] = {"faces_en": wall.strip(), "prompt": wide}
+        out[f"{vid}_near"] = {"faces_en": wall.strip(), "prompt": close}
+    out["_backs_to_a"] = list(pv.backs_to_a or [])
     return out, usage
 
 
-class _ShotView(BaseModel):
-    shot_id: str
-    view: str = Field(description="'A' or 'B'")
+def plate_similarity(a: bytes, b: bytes) -> float:
+    """兩張空景有多像（灰階 64×36 的相關係數）。正反打該很不像：正式管線真正反打 0.13～0.18；
+    第 61 場舊版同一個角落 0.447、同機位不同時間 0.569 → 門檻 PLATE_TOO_SIMILAR。"""
+    import io
+
+    import numpy as np
+    from PIL import Image, ImageOps
+
+    def sig(x):
+        arr = np.asarray(ImageOps.grayscale(Image.open(io.BytesIO(x))).resize((64, 36)), dtype=np.float32)
+        return (arr - arr.mean()) / (arr.std() + 1e-6)
+    return float((sig(a) * sig(b)).mean())
 
 
-class _ShotViews(BaseModel):
-    positions: str = Field(description=(
-        "First, from the blocking: where each person stands in the room and which wall they face during the "
-        "conversation (one or two sentences)."))
-    shots: list[_ShotView]
+PLATE_TOO_SIMILAR = 0.35
+VISION_MODEL = "nvidia/Nemotron-3.5-Super-VL"   # 問 Nebius /v1/models 找到的看圖版 Nemotron
 
 
-def assign_views(shots: list[dict], faces: dict[str, str], blocking: str = "") -> tuple[dict[str, str], dict]:
-    """每一鏡用哪張空景：{shot_id: "A"|"B"}。
+def plate_people(data: bytes) -> str | None:
+    """空景裡有沒有人（含鏡子裡的倒影）；有就回傳在哪裡，沒有回 None，沒金鑰／叫不動也回 None（不擋）。
 
-    不給正反打空景，切換角度的時候會穿幫 —— 所以每一鏡挑對 A／B 是關鍵。
-    第一版只問「哪一面在人背後」，第 61 場（隔著鏡子對話）判出 18 鏡 B、2 鏡 A，不像正反打。
-    改成照拍攝邏輯一步一步：先從走位定每個人站哪、面向哪 → 拍一個人看到的是她背後的牆 →
-    對話的正反打兩個人通常各自背對不同的牆。
-    """
-    listing = "\n".join(f"{s['shot_id']} ({s.get('shot_type')}, {', '.join(s.get('characters_in_frame') or [])}): "
-                        f"{s.get('description') or ''}" for s in shots)
-    user = (f"View A shows {faces.get('A')}.\nView B shows {faces.get('B')} (the opposite wall; the camera has "
-            f"turned around).\n\nBlocking of the scene: {blocking}\n\n"
-            "Step 1: from the blocking, decide where each person stands and which way they face.\n"
-            "Step 2: a camera that films a person's face looks at that person, so the wall in the background is the "
-            "wall BEHIND that person (the wall they have their back to). If a person faces a mirror and is filmed "
-            "from behind or via the mirror, the background is the mirror wall.\n"
-            "Step 3: in shot / reverse-shot coverage of two people talking, each person is usually seen against a "
-            "different wall — keep each person's background consistent from shot to shot unless they move.\n\n"
-            f"For each shot, answer A or B. Shots:\n{listing}")
-    res, usage = _ask("場面調度", "You are a director of photography assigning backgrounds for "
-                      "shot / reverse-shot coverage, so cuts between angles never show an impossible background.",
-                      user, _ShotViews)
-    out = {v.shot_id: ("B" if v.view.strip().upper().startswith("B") else "A") for v in res.shots}
-    return {s["shot_id"]: out.get(s["shot_id"], "A") for s in shots}, usage
+    第 61 場新版四張空景：中空景鏡子裡站著一個人影。Nemotron VL 四張全判對（每張約 5 秒）。"""
+    import base64
+    import json as _json
+
+    from . import nebius_client, settings_store
+
+    key = settings_store.key("nebius")
+    if not key:
+        return None
+    q = ("Look at this photo of an empty film set. Is there any person, human figure, silhouette, or reflection of a "
+         'person anywhere (including in mirrors or glass)? Answer with JSON only: {"people": true|false, "where": "..."}')
+    msg = [{"role": "user", "content": [{"type": "text", "text": q}, {"type": "image_url", "image_url": {
+        "url": "data:image/png;base64," + base64.b64encode(data).decode()}}]}]
+    try:
+        text, _ = nebius_client.chat(msg, VISION_MODEL, key, temperature=0, max_tokens=2000, timeout_s=120)
+        m = re.search(r"\{.*\}", text, re.S)
+        ans = _json.loads(m.group(0)) if m else {}
+    except Exception:  # noqa: BLE001 - 檢查叫不動不擋生成，只是少一道關
+        return None
+    return (ans.get("where") or "somewhere in the frame") if ans.get("people") else None
+
+
+def outfit_zh(data: bytes) -> str | None:
+    """看全身卡，回這個人最外層那件衣服的中文（「淡藍色雪紡長洋裝」），給同框鏡標「誰講這句」用。叫不動回 None。
+
+    為什麼看圖不看文字：第三世試跑，選角候選的文字標籤寫 pale pink chiffon dress，生圖模型畫成淡藍色；
+    台詞行照文字寫「穿淡粉色連衣裙的璃安」→ 文字壓過參考卡，從 s002_03 起整條鏈的裙子變粉紅。
+    正式製作的標籤是人看著卡寫的，所以從來對得上 —— 這裡改成看卡本身。"""
+    import base64
+    import json as _json
+
+    from . import nebius_client, settings_store
+
+    key = settings_store.key("nebius")
+    if not key:
+        return None
+    q = ("Look at the person or character in this picture. Name the colour and type of the outermost thing they wear "
+         "(or, if they wear nothing, their body covering, e.g. 'silver metal armour', 'orange striped fur'), "
+         'in Traditional Chinese, at most 10 characters. Answer with JSON only: {"outfit": "..."}')
+    msg = [{"role": "user", "content": [{"type": "text", "text": q}, {"type": "image_url", "image_url": {
+        "url": "data:image/png;base64," + base64.b64encode(data).decode()}}]}]
+    try:
+        text, _ = nebius_client.chat(msg, VISION_MODEL, key, temperature=0, max_tokens=2000, timeout_s=120)
+        m = re.search(r"\{.*\}", text, re.S)
+        out = (_json.loads(m.group(0)) if m else {}).get("outfit", "").strip("。. ")
+    except Exception:  # noqa: BLE001 - 標不了不影響生成，只是同框鏡少一個辨認依據
+        return None
+    return out or None
 
 
 class _FirstFrame(BaseModel):

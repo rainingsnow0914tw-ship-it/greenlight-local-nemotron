@@ -46,7 +46,8 @@ def upload_refs(url: str, paths: list[str]) -> list[str]:
 
 
 def build_workflow(prompt: str, ref_files: list[str], seed: int, duration_seconds: float,
-                   megapixels: float, prefix: str, text_encoder: str | None = None) -> dict:
+                   megapixels: float, prefix: str, text_encoder: str | None = None,
+                   first_frame: str | None = None, audio_seed: str | None = None, aspect: str = "16:9") -> dict:
     """把參數塞進 H3 四步參考圖工作流。參考圖照順序接成 ref_image_0、1…，對上提示詞的 <Picture 1>、<Picture 2>…。
 
     text_encoder：非 RTX 50 系列的卡改用 int8 版文字編碼器（machine/stack.py 的 alt_for_older_gpus）。
@@ -59,10 +60,42 @@ def build_workflow(prompt: str, ref_files: list[str], seed: int, duration_second
     p["140:129"]["inputs"]["noise_seed"] = int(seed)
     p["140:133"]["inputs"]["value"] = float(duration_seconds)
     p["115"]["inputs"]["megapixels"] = float(megapixels)
+    # 專案比例（模板寫死 16:9 → 幕後第 1 集設直式 9:16，生出來還是橫的；ResolutionSelector 的選項是問 /object_info 的）
+    p["115"]["inputs"]["aspect_ratio"] = {"9:16": "9:16 (Portrait Widescreen)"}.get(aspect, "16:9 (Widescreen)")
     p["92"]["inputs"]["filename_prefix"] = prefix
     if text_encoder:
         p["140:128"]["inputs"]["clip_name"] = text_encoder
+    if first_frame:
+        # 接幀：上一鏡修過畫質的末幀釘在第 0 格，參考卡照餵（作者 H3 萬用工作流的 ② 例外釘點：
+        # 參考卡模式又要首幀 → MiniMaxH3AddGuide frame_idx=0）。卡不拿掉：連幀鏡衣服會漂，要靠卡拉回來。
+        p["960"] = {"class_type": "LoadImage", "inputs": {"image": first_frame}}
+        p["961"] = {"class_type": "MiniMaxH3AddGuide",
+                    "inputs": {"positive": ["140:131", 0], "latent": ["140:131", 1], "frame_idx": 0,
+                               "vae": ["140:119", 0], "image": ["960", 0]}}
+        p["140:126"]["inputs"]["conditioning"] = ["961", 0]
+    if audio_seed:
+        # 聲音種子：AddGuide 的 audio 釘在第 0 格，自動裁到影片長度（正式管線 generate_ch.py 的 9050 節點）。
+        # 沒台詞的人物鏡釘絕對靜音 → 嘴閉著、不冒呢喃；碰撞聲、腳步這種動作聲照樣有（第五章 s016_01）。
+        p["962"] = {"class_type": "LoadAudio", "inputs": {"audio": audio_seed}}
+        p["963"] = {"class_type": "MiniMaxH3AddGuide",
+                    "inputs": {"positive": p["140:126"]["inputs"]["conditioning"], "latent": ["140:131", 1],
+                               "frame_idx": 0, "audio_vae": ["140:120", 0], "audio": ["962", 0]}}
+        p["140:126"]["inputs"]["conditioning"] = ["963", 0]
     return p
+
+
+def build_clean_frame(image: str, model: str, width: int, height: int, prefix: str) -> dict:
+    """接幀前修末幀：RealESRGAN ×4 → lanczos 縮回生成尺寸。
+
+    不修的話每接一次糊一點，接三四鏡就整片發霧（作者管線 定案：接末幀一律自動修畫質）。"""
+    return {
+        "1": {"class_type": "LoadImage", "inputs": {"image": image}},
+        "2": {"class_type": "UpscaleModelLoader", "inputs": {"model_name": model}},
+        "3": {"class_type": "ImageUpscaleWithModel", "inputs": {"upscale_model": ["2", 0], "image": ["1", 0]}},
+        "4": {"class_type": "ImageScale", "inputs": {"image": ["3", 0], "upscale_method": "lanczos",
+                                                     "width": width, "height": height, "crop": "disabled"}},
+        "5": {"class_type": "SaveImage", "inputs": {"images": ["4", 0], "filename_prefix": prefix}},
+    }
 
 
 def render(url: str, workflow: dict, on_progress: Callable[[dict], None] | None = None,

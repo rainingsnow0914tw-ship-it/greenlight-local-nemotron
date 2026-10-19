@@ -95,6 +95,11 @@ def round_cost_usd() -> float:
     候選圖一律用 Imagen 4 Fast —— 選擇階段不需要極致畫質，
     能分辨長相差異就夠了。選定之後才用 Standard 重生正式版。
     """
+    from . import settings_store
+
+    # 本機（Qwen 走使用者的 ComfyUI）不花錢 —— 第三世試跑：實際花 $0，畫面卻寫一輪 $0.06
+    if settings_store.role_for("生成角色候選圖")[1].get("provider") != "google":
+        return 0.0
     cfg = _casting_config()
     per_round = int(cfg.get("candidates_per_round", 3))
     pricing = config_loader.pricing()

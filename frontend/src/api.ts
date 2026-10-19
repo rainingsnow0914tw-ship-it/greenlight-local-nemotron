@@ -44,10 +44,9 @@ export function t(value: Localized | string | undefined, lang: Lang): string {
  *    log 上完全看不到這種故障（沒有請求 = 沒有紀錄），
  *    只能從「一段時間內零筆 POST」反推出來。
  *
- * 生成類的請求要給足夠長的上限：後端自己的上限是 300 秒，
- *    這裡給 340 秒（留 40 秒讓後端把逾時錯誤好好回出來）。
- *    比後端短的話，會在後端正要回報錯誤時把連線切掉，
- *    使用者反而看不到原因。
+ * 生成類的請求要給足夠長的上限（見 post()：本機一鏡 8 分鐘以上，給 45 分鐘）。
+ *    比後端短的話，會在後端還在做、或正要回報錯誤時把連線切掉，
+ *    使用者反而看不到結果。
  */
 async function fetchWithTimeout(
   path: string,
@@ -93,6 +92,8 @@ export interface ProgressSummary {
   project_id: string
   title: string
   stage: string
+  /** 左側進度燈：stage 與走最遠那一段的較後者（只顯示用） */
+  rail_stage?: string
   stage_label: string
   stage_description: string
   step: number
@@ -106,6 +107,8 @@ export interface ProgressSummary {
   format_id?: string
   aspect_ratio?: string
   updated_at: string
+  /** 內建範例的標示（三語分開寫）：這一例示範什麼、走哪條路 */
+  sample_info?: { title: Record<string, string>; note: Record<string, string> } | null
 }
 
 export interface Character {
@@ -208,6 +211,8 @@ export interface LearningState {
   connected: boolean
   records: number
   first_pass_rate: number | null
+  /** 內建範例才有：最終版收下幾鏡／共幾鏡（不顯示成功率） */
+  sample_final?: { accepted: number; total: number } | null
   first_tries: number
   rejected: number
   distinct_shots: number
@@ -431,6 +436,8 @@ export interface Shot {
   camera_move: string
   description: string
   visual_prompt: string | null
+  /** 使用者上傳的首幀（媒體庫 uri），有就原圖釘在第 0 格 */
+  user_first_frame?: string | null
   characters_in_frame: string[]
   dialogue: string | null
   content_flags: string[]
@@ -504,9 +511,9 @@ async function errorMessage(res: Response): Promise<string> {
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
-  // 生成類的請求會跑好幾分鐘（後端上限 300 秒），其餘都是秒回。
-  // 一律給 340 秒最省事 —— 上限的用途是「不要永遠卡住」，
-  // 不是精算每種請求該等多久。
+  // 生成類的請求會跑好幾分鐘，其餘都是秒回。上限的用途是「不要永遠卡住」，不是精算每種請求該等多久。
+  // 第三世試跑：本機 H3 一鏡 8 分鐘＋查證＋診斷，舊的 340 秒（Cloud Run 的 300 秒上限時代）
+  //    在後端還在生的時候把連線切掉 —— 影片其實生好了，畫面卻說「沒有回應」。本機後端沒有 300 秒上限。
   const res = await fetchWithTimeout(
     path,
     {
@@ -514,7 +521,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
       headers: body ? { 'Content-Type': 'application/json' } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     },
-    340_000,
+    2_700_000,
   )
   if (!res.ok) throw new Error(uiText(await errorMessage(res)))
   return (await res.json()) as T
@@ -699,6 +706,17 @@ export const castingApi = {
     )
     const data = await res.json()
     if (!res.ok) throw new Error(uiText(data.detail || data.message || `HTTP ${res.status}`))
+    return data as { session: CastingSession; gate: CastingGate }
+  },
+
+  /** 上傳的那張原圖直接當這個角色（不經模型重畫；使用者自備人物卡） */
+  useIdentity: async (id: string, character: string) => {
+    const res = await fetch(
+      `/api/projects/${id}/casting/identity/use?character=${encodeURIComponent(character)}`,
+      { method: 'POST' },
+    )
+    const data = await res.json()
+    if (!res.ok) throw new Error(uiText(data.detail || `HTTP ${res.status}`))
     return data as { session: CastingSession; gate: CastingGate }
   },
 
@@ -893,9 +911,10 @@ export const videoApi = {
    * `auto=true`：放行那道閘門，給一鍵模式連續呼叫用。
    *   **一鍵不等於自動通過** —— 生出來一樣停在待確認，最後一次過目。
    */
-  nextClip: (id: string, order: number, auto = false) =>
+  nextClip: (id: string, order: number, auto = false, shotId?: string) =>
     post<BatchState>(
-      `/api/projects/${id}/segments/${order}/batch/next${auto ? '?auto=true' : ''}`,
+      `/api/projects/${id}/segments/${order}/batch/next?${new URLSearchParams({
+        ...(auto ? { auto: 'true' } : {}), ...(shotId ? { shot_id: shotId } : {}) })}`,
     ),
 
   approveClip: (id: string, order: number, shotId: string) =>

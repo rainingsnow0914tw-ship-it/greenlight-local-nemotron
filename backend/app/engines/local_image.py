@@ -36,7 +36,7 @@ class Unavailable(Exception):
 
 
 def _url() -> str:
-    return settings_store.load().get("comfy_url", "http://127.0.0.1:8189")
+    return settings_store.comfy_url()
 
 
 _LOADER_FIELDS = ("unet_name", "clip_name", "vae_name", "lora_name")

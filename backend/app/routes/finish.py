@@ -28,11 +28,13 @@ def _segment(project_id: str, order: int):
 
 
 @router.post("/{project_id}/segments/{order}/finish")
-def start_finish(project_id: str, order: int):
+def start_finish(project_id: str, order: int, subs_only: bool = False):
     state, seg = _segment(project_id, order)
     if not any(c.uri for c in seg.clips):
         raise HTTPException(409, "no generated shots in this part yet")
-    return {"started": finish.start(project_id, order), "running": finish.is_running(project_id, order)}
+    if subs_only and not (seg.finish_outputs.get("master") and seg.finish_cues):
+        raise HTTPException(409, "no finished master yet — run the full finish first")
+    return {"started": finish.start(project_id, order, subs_only), "running": finish.is_running(project_id, order)}
 
 
 @router.get("/{project_id}/segments/{order}/finish")
@@ -42,7 +44,30 @@ def finish_state(project_id: str, order: int, since: int = 0):
     running = finish.is_running(project_id, order)
     return {"status": "running" if running else ("interrupted" if seg.finish_status == "running" else seg.finish_status),
             "log": seg.finish_log[since:], "total": len(seg.finish_log), "outputs": list(seg.finish_outputs),
-            "shots_ready": sum(1 for c in seg.clips if c.uri)}
+            "shots_ready": sum(1 for c in seg.clips if c.uri),
+            # 閃白開關：照分鏡順序列出有片的鏡（第一鏡前面沒有東西可閃，不列）
+            "flash": [{"shot_id": s.shot_id, "on": bool(s.flash_before)}
+                      for s in (seg.shot_list.shots if seg.shot_list else [])
+                      if any(c.shot_id == s.shot_id and c.uri for c in seg.clips)][1:]}
+
+
+@router.put("/{project_id}/segments/{order}/finish/flash/{shot_id}")
+def set_flash(project_id: str, order: int, shot_id: str, body: dict):
+    """這一鏡前面要不要閃白（同一場戲裡時間過了一下：位置跳了、情緒跳了）。下次成片生效。"""
+    on = bool(body.get("on"))
+    _segment(project_id, order)
+    if finish.is_running(project_id, order):
+        raise HTTPException(409, "finishing is running — change transitions after it ends")
+
+    def apply(state):
+        sg = next(s for s in state.segments if s.order == order)
+        shot = next((s for s in sg.shot_list.shots if s.shot_id == shot_id), None) if sg.shot_list else None
+        if shot is None:
+            raise HTTPException(404, f"no shot {shot_id}")
+        shot.flash_before = on
+
+    project_store.get_store().mutate(project_id, apply)
+    return {"shot_id": shot_id, "on": on}
 
 
 @router.get("/{project_id}/segments/{order}/finish/{key}")

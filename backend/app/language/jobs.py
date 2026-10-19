@@ -53,7 +53,10 @@ def collect(state, seg) -> list[dict]:
             out.append({
                 "id": f"L{len(out) + 1}", "shot_id": shot.shot_id, "k": k,
                 "speaker": d.get("speaker") or shot.speaker or "",
-                "listeners": [c for c in shot.characters_in_frame if c != (d.get("speaker") or shot.speaker)],
+                # 畫面裡沒有別人＝對著鏡頭講（主持、旁白式講解）：寫明聽的人是觀眾，不然模型預設客氣的「〜ください」
+                #    （幕後第 1 集：「留言告訴我們」被寫成「コメントで教えてください」）
+                "listeners": [c for c in shot.characters_in_frame if c != (d.get("speaker") or shot.speaker)]
+                             or ["the viewers (talking straight to the camera)"],
                 "voice_role": shot.voice_role, "scene": shot.director_scene_id or "",
                 "seconds": round(sec / max(1, len(entries)), 1),
                 "max_units": gates.max_units(sec / max(1, len(entries)), film),
@@ -72,19 +75,39 @@ def people(state, seg) -> dict[str, str]:
             if c.get("name"):
                 out[c["name"]] = c.get("kind") or out.get(c["name"], "")
     en = glossary_en(state)
+    cast = set(out)
     for name, say in glossary(state).items():
-        note = (f"a name — say it as {say}" if say else "a name") + (f"; in English subtitles write {en[name]}" if name in en else "")
-        out[name] = (out.get(name, "") + "; " + note).strip("; ")
+        if name in cast or not say:
+            note = (f"a name — say it as {say}" if say else "a name") + (f"; in English subtitles write {en[name]}" if name in en else "")
+            out[name] = (out.get(name, "") + "; " + note).strip("; ")
+        else:
+            # 名字表裡不是角色的那幾行＝專有名詞／用語（提示詞=プロンプト/prompt）：照這個翻，不是當成人名
+            #    （幕後第 1 集：「翻車」被照字面寫成「事故現場」、「提示詞」沒有固定譯法）
+            out[name] = f"a term (not a person) — in the film language always say it as {say}"                 + (f"; in English subtitles write {en[name]}" if name in en else "")
+    for name, persona in personas(state).items():
+        out[name] = (out.get(name, "") + f"; personality: {persona}").strip("; ")
     return out
 
 
 def _rows(state):
-    """名字表一行「名字=原聲唸法/英文寫法」（英文可省）。例：深息=シェンシー/Shenxi（第二世正典譯名）。"""
+    """名字表一行「名字=原聲唸法/英文寫法/個性」（後兩段可省）。例：深息=シェンシー/Shenxi/溫柔的男生，自稱僕。"""
     for row in (state.name_glossary or "").splitlines():
         name, _, rest = row.partition("=")
-        say, _, en = rest.partition("/")
+        say, _, tail = rest.partition("/")
+        en, _, _ = tail.partition("/")
         if name.strip():
             yield name.strip(), say.strip(), en.strip()
+
+
+def personas(state) -> dict[str, str]:
+    """{名字: 個性}：名字表第四段（幕後第 1 集：深息是溫柔的男生、自稱僕 —— 台詞導演不知道，重跑一次就變回「私」）。"""
+    out = {}
+    for row in (state.name_glossary or "").splitlines():
+        name, _, rest = row.partition("=")
+        parts = rest.split("/", 2)
+        if name.strip() and len(parts) == 3 and parts[2].strip():
+            out[name.strip()] = parts[2].strip()
+    return out
 
 
 def glossary(state) -> dict[str, str]:
@@ -191,12 +214,63 @@ def write_dialogue(sg, directed: bool) -> None:
             shot.dialogue = pick(keep[(shot.shot_id, 0)])
 
 
+def remap_lines(sg, shot_ids: list[str]) -> None:
+    """一鏡被修過（併了鄰鏡的短句、鏡號變了）之後，台詞導演的結果照「原句」重新對回去。
+
+    台詞導演的結果用 (鏡號, 第幾句) 對分鏡表；修鏡會把句子搬到別鏡、句序也變，照鏡號對會配錯句。
+    原句（source）不會變 → 用它找回是哪一句，送 H3 的字換回導過的版本（say）。"""
+    norm = lambda t: re.sub(r"[\s「」『』。、！？!?,.]", "", t or "")  # noqa: E731
+    by_src = {norm(ln.get(f)): ln for ln in sg.lines for f in ("say", "spoken", "source") if ln.get(f)}
+    if not by_src:
+        return
+    for shot in sg.shot_list.shots:
+        if shot.shot_id not in shot_ids:
+            continue
+        entries = shot.dialogue_lines or ([{"speaker": shot.speaker, "text": shot.dialogue}] if shot.dialogue else [])
+        for k, d in enumerate(entries):
+            ln = by_src.get(norm(d.get("text"))) or _merge_run(sg, norm(d.get("text")), norm)
+            if ln:
+                ln["shot_id"], ln["k"] = shot.shot_id, k
+                d["text"] = ln.get("say") or ln.get("spoken") or d["text"]
+        if shot.dialogue_lines:
+            shot.dialogue = "　".join(d.get("text", "") for d in shot.dialogue_lines)
+        elif entries:
+            shot.dialogue = entries[0]["text"]
+    sg.subtitles = {}
+
+
+def _merge_run(sg, text: str, norm) -> dict | None:
+    """兩鏡合成一鏡（修鏡把拆成兩半的一句接起來）：台詞導演的結果也是兩筆半句 → 找連續幾筆、原句接起來正好是這一句的，
+    合成一筆（原句、口語、送 H3 的字、讀音、字幕各自接起來），其餘幾筆拿掉。找不到回 None。"""
+    rows = sg.lines
+    for i in range(len(rows)):
+        acc = ""
+        for j in range(i, min(i + 4, len(rows))):
+            acc += norm(rows[j].get("source"))
+            if acc == text and j > i:
+                run = rows[i:j + 1]
+                head = dict(run[0])
+                for f in ("source", "spoken", "say", "ruby"):
+                    head[f] = "".join(r.get(f) or "" for r in run)
+                for f in [k for k in head if k.startswith("sub_")]:
+                    head[f] = " ".join((r.get(f) or "").strip() for r in run).strip()
+                sg.lines = rows[:i] + [head] + rows[j + 1:]
+                return head
+            if not text.startswith(acc):
+                break
+    return None
+
+
 def apply(project_id: str, order: int, results: list[dict], notes: list[dict], usage: dict) -> None:
     """結果存進段落、導過的台詞寫回分鏡表（H3 唸這個）；舊字幕快取作廢。"""
     st0 = project_store.get_store().load(project_id)
     table = {name: "" for name in people(st0, _seg(st0, order)) if re.search(r"[一-鿿]", name)}
     table.update(glossary(st0))
     for r in results:
+        # 讀音標記只該在 ruby 欄位；模型偶爾把「ぷく[ぷく]」寫進原字欄位 → 字幕出現方括號、H3 照著唸（第三世試跑 L8）
+        #    strip_ruby 只認「漢字[よみ]」，「ぷく[ぷく]」這種假名後面的它不剝 → 原字欄位本來就不該有方括號，整段拿掉
+        if "[" in (r.get("spoken") or ""):
+            r["spoken"] = re.sub(r"\[[^\]]*\]", "", r["spoken"])
         if st0.film_language == "ja":   # 名字表寫了唸法 → 字幕上的讀音也照它（深息是シェンシー，模型標成しんそく）
             for name, reading in glossary(st0).items():
                 if reading and re.search(r"[一-鿿]", name):

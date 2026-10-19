@@ -72,7 +72,8 @@ def _split_top(toks, font, maxw):
         return [toks]
     cands = [k + 1 for k, (x, _) in enumerate(toks[:-1]) if x in "、。？！…　，,.?! "] or list(range(1, len(toks)))
     k = min(cands, key=lambda k: max(width(toks[:k]), width(toks[k:])))
-    return [toks[:k], [x for x in toks[k:] if x[0] not in "　 "]]
+    # 兩半各自還太寬就再斷（直式 1080 寬：一句斷兩行還是超出畫面、左右被切掉）
+    return _split_top(toks[:k], font, maxw) + _split_top([x for x in toks[k:] if x[0] not in "　 "], font, maxw)
 
 
 def _split_bottom(s, font, lang, limit):
@@ -90,14 +91,14 @@ def _split_bottom(s, font, lang, limit):
     return lines
 
 
-def render(line: dict, film: str, lang: str, size: tuple[int, int], out: Path) -> None:
-    """一句字幕畫成一張透明圖（跟影片一樣大）。"""
+def render(line: dict, film: str, lang: str, size: tuple[int, int], out: Path, names: dict | None = None) -> None:
+    """一句字幕畫成一張透明圖（跟影片一樣大）。names＝名字表 {名字: 唸法}，名字的讀音照它標。"""
     from PIL import Image, ImageDraw, ImageFont
 
     W, H = size
-    k0 = H / 1080
+    k0 = min(W, H) / 1080   # 字級照短邊：直式 1080×1920 照高度算會大 1.78 倍、一行塞不下（範例 2）
     maxw = W * 0.958
-    toks = gates.tokens(line["ruby"] or line["spoken"])
+    toks = gates.tokens(gates.name_ruby(line["ruby"] or line["spoken"], names))
     bottom = (line.get("subs") or {}).get(lang, "")
 
     def fit(path, px, width_of):
@@ -155,7 +156,7 @@ def probe(video: Path) -> tuple[int, int, float]:
     return int(m.group(1)), int(m.group(2)), int(t.group(1)) * 3600 + int(t.group(2)) * 60 + float(t.group(3))
 
 
-def burn(video: Path, items: list[dict], film: str, lang: str, out: Path) -> Path:
+def burn(video: Path, items: list[dict], film: str, lang: str, out: Path, names: dict | None = None) -> Path:
     """把學習字幕燒進影片。items＝cues() 的結果。會重新編碼（燒字幕的本質）。"""
     if not items:
         raise StudySubError("這一段沒有導過的台詞可以上字幕")
@@ -164,7 +165,7 @@ def burn(video: Path, items: list[dict], film: str, lang: str, out: Path) -> Pat
         pngs = []
         for i, c in enumerate(items):
             p = Path(tmp) / f"sub_{i:03d}.png"
-            render(c["line"], film, lang, (W, H), p)
+            render(c["line"], film, lang, (W, H), p, names)
             pngs.append((p, c["start"], c["end"]))
         # 單張圖只有一格，不 loop 的話過了第一句就沒圖可疊（第三世 踩過：只剩第一句有字幕）
         ins = sum([["-loop", "1", "-t", f"{T:.2f}", "-i", str(p)] for p, _, _ in pngs], [])

@@ -132,6 +132,8 @@ export interface Copy {
   identityConsentRequired: string
   identityUploading: string
   identityGenerate: string
+  identityUseAsIs: string
+  identityUseAsIsNote: string
   identityGenerateUnlockNote: string
   lookModeTitle: string
   lookModeDefault: string
@@ -313,7 +315,7 @@ const zh: Copy = {
   guardsAdvisory: '提示詞解決不了、要改工作流的事',
   castingTitle: '選角',
   castingWhy:
-    '角色長相是所有鏡頭的地基。一張候選圖 $0.02、一個八秒鏡頭 $0.80、一支三分鐘的片 $18 —— 在這裡多挑幾輪，比之後重來便宜得多。',
+    '角色長相是所有鏡頭的地基。一張候選圖幾秒鐘、一個八秒鏡頭要好幾分鐘、一整支片要好幾個小時 —— 在這裡多挑幾輪，比之後重來省得多。',
   castingProgress: '已選定',
   castingBlocked: '所有角色選定後才能開始生成影片',
   castingReady: '角色都選定了，可以往下走',
@@ -338,6 +340,8 @@ const zh: Copy = {
   identityConsentRequired: '要先勾選確認才能上傳。',
   identityUploading: '上傳中…',
   identityGenerate: '用這張臉生成角色卡',
+  identityUseAsIs: '直接用這張（原圖，不重畫）',
+  identityUseAsIsNote: '自己已經做好的人物卡：原圖就是角色卡，全身卡也用這張，模型不會改畫風或衣服。',
   identityGenerateUnlockNote: '這個角色已鎖定 —— 會先解除選定，再用這張臉重新生三張造型候選。已生成的鏡頭不會自動失效。',
   lookModeTitle: '造型用於',
   lookModeDefault: '全片預設',
@@ -378,7 +382,7 @@ const zh: Copy = {
   testShotTitle: '試拍一鏡',
   testShotWhy: '先生一鏡，換一個「這批到底能不能看」的答案。整段要生好幾個小時，這一鏡幾分鐘。試拍不通過就不能開始批次生成。',
   testShotRun: '試拍',
-  testShotRunning: '生成中，約需 1–3 分鐘……',
+  testShotRunning: '生成中，本機一鏡約 5–10 分鐘（看秒數與顯示卡）……',
   testShotApprove: '通過，開始批次',
   testShotApproved: '試拍已通過',
   testShotRetake: '重新試拍',
@@ -386,7 +390,7 @@ const zh: Copy = {
   batchWhy: '一鏡一鏡生，每一鏡看過再生下一鏡。中途離開也沒關係 —— 進度存著，回來從同一個地方接下去。',
   batchProgress: '已通過',
   batchNext: '生成下一鏡',
-  batchGenerating: '生成中，約需 1–3 分鐘……',
+  batchGenerating: '生成中，本機一鏡約 5–10 分鐘（看秒數與顯示卡）……',
   batchApprove: '通過',
   batchRetry: '重拍',
   batchRetake: '反悔重拍',
@@ -539,6 +543,8 @@ const en: Copy = {
   identityConsentRequired: 'Tick the confirmation before uploading.',
   identityUploading: 'Uploading…',
   identityGenerate: 'Generate character card from this face',
+  identityUseAsIs: 'Use this image as is (no redraw)',
+  identityUseAsIsNote: 'For a character card you already made: the image itself becomes the character card and the full-body card; the model never changes its style or clothes.',
   identityGenerateUnlockNote: 'This character is locked — it will be unlocked first, then three new looks are generated from this face. Shots already generated are not invalidated automatically.',
   lookModeTitle: 'Look applies to',
   lookModeDefault: 'Whole film (default)',
@@ -579,7 +585,7 @@ const en: Copy = {
   testShotTitle: 'Test shot',
   testShotWhy: 'One shot buys you the answer to "is this batch worth it". The full segment takes hours of GPU time; this takes minutes. Batch generation stays locked until a test shot passes.',
   testShotRun: 'Run test shot',
-  testShotRunning: 'Generating — 1–3 minutes…',
+  testShotRunning: 'Generating — about 5–10 minutes per shot on this computer (depends on length and GPU)…',
   testShotApprove: 'Approve and unlock batch',
   testShotApproved: 'Test shot approved',
   testShotRetake: 'Shoot again',
@@ -587,7 +593,7 @@ const en: Copy = {
   batchWhy: 'One shot at a time — you see each one before the next is generated. Leave whenever you like; progress is saved and picks up where you left off.',
   batchProgress: 'approved',
   batchNext: 'Generate next shot',
-  batchGenerating: 'Generating — 1–3 minutes…',
+  batchGenerating: 'Generating — about 5–10 minutes per shot on this computer (depends on length and GPU)…',
   batchApprove: 'Approve',
   batchRetry: 'Reshoot',
   batchRetake: 'Retake this shot',
@@ -715,7 +721,7 @@ const ja: Copy = {
   guardsAdvisory: 'プロンプトでは直らない — 進め方を変える必要があります',
   castingTitle: 'キャスティング',
   castingWhy:
-    'キャラクターの見た目は全カットの土台。候補画像 1 枚 $0.02、8 秒のカット $0.80、3 分の作品 $18 —— ここで何回か引き直すほうが、あとでやり直すよりずっと安い。',
+    'キャラクターの見た目は全カットの土台。候補画像は数秒、8 秒のカットは数分、作品全体は数時間 —— ここで何回か引き直すほうが、あとでやり直すよりずっと早い。',
   castingProgress: '確定済み',
   castingBlocked: '全キャラクターが確定するまで映像生成には進めません',
   castingReady: 'キャラクターが揃いました。次へ進めます',
@@ -740,6 +746,8 @@ const ja: Copy = {
   identityConsentRequired: 'アップロード前に確認にチェックしてください。',
   identityUploading: 'アップロード中…',
   identityGenerate: 'この顔でキャラクターカードを生成',
+  identityUseAsIs: 'この画像をそのまま使う（描き直さない）',
+  identityUseAsIsNote: '自分で作ったキャラクターカード向け：この画像がそのままキャラクターカード・全身カードになり、画風も衣装も変えません。',
   identityGenerateUnlockNote: 'このキャラクターは確定済みです。先に確定を解除し、この顔から新しいルック候補を 3 枚生成します。生成済みのショットは自動では無効になりません。',
   lookModeTitle: 'ルックの適用先',
   lookModeDefault: '全編（デフォルト）',
@@ -780,7 +788,7 @@ const ja: Copy = {
   testShotTitle: 'テスト撮影',
   testShotWhy: '1 カット分の費用で「このバッチは見られるものになるか」の答えが買える。セグメント全体は $9〜$72、これは 1 ドル未満。テストが通るまでバッチ生成はロックされたまま。',
   testShotRun: 'テスト撮影',
-  testShotRunning: '生成中、1〜3 分ほど……',
+  testShotRunning: '生成中、このPCで1カット 5〜10 分ほど（長さとGPUによる）……',
   testShotApprove: '承認してバッチを開始',
   testShotApproved: 'テスト撮影は承認済み',
   testShotRetake: '撮り直す',
@@ -788,7 +796,7 @@ const ja: Copy = {
   batchWhy: '1 カットずつ生成し、確認してから次へ。途中で離れても大丈夫 —— 進捗は保存され、同じところから再開できます。',
   batchProgress: '承認済み',
   batchNext: '次のカットを生成',
-  batchGenerating: '生成中、1〜3 分ほど……',
+  batchGenerating: '生成中、このPCで1カット 5〜10 分ほど（長さとGPUによる）……',
   batchApprove: '承認',
   batchRetry: '撮り直し',
   batchRetake: 'このカットを撮り直す',

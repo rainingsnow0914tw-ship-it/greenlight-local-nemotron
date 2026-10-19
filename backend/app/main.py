@@ -69,6 +69,14 @@ async def lifespan(app: FastAPI):
         logger.info("sample: %s", sample.install_if_needed())
     except Exception:  # noqa: BLE001
         logger.exception("sample install failed")
+    try:   # app 自己裝的 ComfyUI：重開機後沒人啟動它 → 開 app 就順手開（背景、不擋啟動）
+        import threading
+
+        from .machine import installer
+
+        threading.Thread(target=installer.ensure_running, daemon=True, name="comfy-autostart").start()
+    except Exception:  # noqa: BLE001
+        logger.exception("comfy autostart failed")
     yield
 
 
@@ -195,6 +203,18 @@ async def handle_demo_blocked(_request: Request, exc: demo_mode.DemoBlocked):
        跟產品其他地方同一個原則：降級可以，靜默不行。
     """
     return JSONResponse(status_code=402, content=exc.as_detail())
+
+
+@app.middleware("http")
+async def no_stale_index(request: Request, call_next):
+    """頁面入口（index.html）每次都重新拿，不讓瀏覽器用舊的：
+    範例 3：app 更新後畫面還是舊版（新按鈕不見），因為瀏覽器快取了舊的 index.html，它指向舊的 js。
+    /assets/* 檔名帶版本雜湊（每次 build 都不同），照常快取；/api/* 不管。"""
+    response = await call_next(request)
+    path = request.url.path
+    if not path.startswith("/api/") and not path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 @app.exception_handler(404)

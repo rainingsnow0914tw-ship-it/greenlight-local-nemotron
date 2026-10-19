@@ -203,6 +203,28 @@ class Shot(BaseModel):
         default=None,
         description="接哪一鏡的末幀當首幀。None = 新起點（場景切換時應為 None）。",
     )
+    flash_before: bool = Field(
+        default=False,
+        description=(
+            "這一鏡前面閃白：前一鏡尾巴淡成白、這一鏡從白淡回來（正式管線 s3_assemble 的閃白）。"
+            "用在同一場戲裡時間跳了一下、情緒前後接不上的地方（例：s061_15→16，"
+            "月音從冷冷質問直接跳到哭著哀求，閃白當作中間吵了一段時間）。"
+        ),
+    )
+    user_first_frame: str | None = Field(
+        default=None,
+        description=(
+            "使用者自己上傳的首幀（媒體庫 uri）。有值就原圖釘在第 0 格，優先於接幀、不修畫質"
+            "（人物卡、空景、首幀都可以自己帶；只有結尾幀要靠我們的接幀）。"
+        ),
+    )
+    gate_waived: bool = Field(
+        default=False,
+        description=(
+            "使用者看過生成前關卡的錯、決定照樣生成（第三世試跑：ぷく的「にゃあ」是貓叫不是講話，"
+            "短句會唸糊那條不適用；前一句是籠外的塔列昂，沒有能併的鏡 —— 關卡分不出來，人分得出來）。"
+        ),
+    )
     reference_image_uri: str | None = Field(
         default=None,
         description="角色參考圖的 GCS URI。有參考圖大幅提升一致性（+0.20）。",

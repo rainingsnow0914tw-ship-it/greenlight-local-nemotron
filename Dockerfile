@@ -54,7 +54,7 @@ COPY config/ ./config/
 # 前端 dist 進到 backend/app/static/：main.py 用 `Path(__file__).parent / "static"`
 #    定位（__file__ 是 backend/app/main.py），所以 static 必須在 app/ 底下同層。
 #    開發時沒有這個目錄就跳過（保留本機 vite dev 一路）。
-COPY --from=frontend-builder /frontend/dist ./backend/app/static/
+COPY --from=frontend-builder /backend/app/static ./backend/app/static/
 
 # config/ 一定要進 image：整個系統是 config 驅動的
 #    （價目表、成功率先驗、物理約束、風格、選角規則、三語提示詞房間）。

@@ -77,8 +77,10 @@ directions:
   - id: reroll
     label: "換一批"
     label_en: "Reroll"
+    label_ja: "引き直す"
     hint: "同樣的方向，三張全新的詮釋"
     hint_en: "Same direction, three fresh interpretations"
+    hint_ja: "同じ方向で、新しい解釈を3枚"
     applies_to: any
     prompt_modifier: ""
     look_variant: true   # 造型模式（段落造型變體）可用：這個方向保臉
@@ -88,32 +90,40 @@ directions:
   - id: younger
     label: "更年輕"
     label_en: "Younger"
+    label_ja: "もっと若く"
     hint: "五官更柔和、皮膚更細緻"
     hint_en: "Softer features, finer skin"
+    hint_ja: "顔立ちを柔らかく、肌をなめらかに"
     applies_to: human
     prompt_modifier: "noticeably younger, softer facial features, smoother skin"
 
   - id: older
     label: "更成熟"
     label_en: "Older"
+    label_ja: "もっと大人っぽく"
     hint: "輪廓更明確、眼神更沉穩"
     hint_en: "Defined contours, calmer gaze"
+    hint_ja: "輪郭をはっきり、まなざしを落ち着かせる"
     applies_to: human
     prompt_modifier: "more mature, defined facial structure, calmer gaze"
 
   - id: softer
     label: "更柔和"
     label_en: "Softer"
+    label_ja: "もっと柔らかく"
     hint: "線條圓潤、氣質親近"
     hint_en: "Rounded lines, approachable presence"
+    hint_ja: "丸みのある線、親しみやすい雰囲気"
     applies_to: human
     prompt_modifier: "softer rounded features, warm approachable expression"
 
   - id: sharper
     label: "更銳利"
     label_en: "Sharper"
+    label_ja: "もっとシャープに"
     hint: "線條俐落、氣場更強"
     hint_en: "Crisp lines, stronger presence"
+    hint_ja: "すっきりした線、存在感を強く"
     applies_to: human
     prompt_modifier: "sharper angular features, striking confident presence"
 
@@ -123,16 +133,20 @@ directions:
   - id: refined
     label: "更有氣質"
     label_en: "More refined"
+    label_ja: "もっと上品に"
     hint: "五官精緻、儀態優雅、造型講究，膚色明亮透亮"
     hint_en: "Refined features, graceful poise, polished styling, bright luminous skin"
+    hint_ja: "整った顔立ち、優雅な佇まい、明るく透明感のある肌"
     applies_to: human
     prompt_modifier: "graceful refined beauty, delicate well-proportioned features, poised elegant posture, polished tasteful styling, fair luminous complexion, bright soft flattering key light, clean airy background tones"
 
   - id: change_hair
     label: "換髮型"
     label_en: "New hair"
+    label_ja: "髪型を変える"
     hint: "保留五官，只換頭髮"
     hint_en: "Keep the face, change the hair"
+    hint_ja: "顔はそのまま、髪だけ変える"
     applies_to: human
     prompt_modifier: "same facial features, distinctly different hairstyle and hair length"
     look_variant: true   # 造型模式（段落造型變體）可用：這個方向保臉
@@ -140,8 +154,10 @@ directions:
   - id: change_wardrobe
     label: "換服裝"
     label_en: "New wardrobe"
+    label_ja: "衣装を変える"
     hint: "保留長相，只換衣服"
     hint_en: "Keep the look, change the clothes"
+    hint_ja: "顔はそのまま、服だけ変える"
     applies_to: human
     prompt_modifier: "same face and hair, different outfit and colour palette"
     look_variant: true   # 造型模式（段落造型變體）可用：這個方向保臉
@@ -150,32 +166,40 @@ directions:
   - id: more_concrete
     label: "更具象"
     label_en: "More literal"
+    label_ja: "もっと具体的に"
     hint: "更接近可辨認的形體"
     hint_en: "Closer to a recognisable form"
+    hint_ja: "見てわかる形に近づける"
     applies_to: non_human
     prompt_modifier: "more literal embodied form, recognisable silhouette"
 
   - id: more_abstract
     label: "更抽象"
     label_en: "More abstract"
+    label_ja: "もっと抽象的に"
     hint: "更接近光、流動、能量"
     hint_en: "Closer to light, flow, energy"
+    hint_ja: "光・流れ・エネルギーに近づける"
     applies_to: non_human
     prompt_modifier: "more abstract, luminous and formless, energy and light rather than solid body"
 
   - id: warmer
     label: "更溫暖"
     label_en: "Warmer"
+    label_ja: "もっと温かく"
     hint: "色溫偏暖、有生命感"
     hint_en: "Warm tones, a sense of life"
+    hint_ja: "暖色寄り、生き物らしさ"
     applies_to: non_human
     prompt_modifier: "warm colour temperature, organic living quality"
 
   - id: colder
     label: "更冷冽"
     label_en: "Colder"
+    label_ja: "もっと冷たく"
     hint: "色溫偏冷、機械感"
     hint_en: "Cool tones, machine-like precision"
+    hint_ja: "寒色寄り、機械らしさ"
     applies_to: non_human
     prompt_modifier: "cool colour temperature, precise machine-like quality"
 
