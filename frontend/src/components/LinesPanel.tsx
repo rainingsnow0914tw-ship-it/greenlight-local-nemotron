@@ -282,7 +282,7 @@ export function LinesPanel({ lang, projectId, order }: { lang: Lang; projectId: 
                       </>
                     )}
                   </td>
-                  <td>{ln.why}</td>
+                  <td>{ln.why && <AiText text={ln.why} lang={lang} projectId={projectId} />}</td>
                   <td>
                     {editing !== ln.id && <button className="btn ghost small" onClick={(e) => {
                       e.stopPropagation(); setEditing(ln.id); setDraft({ ruby: ln.ruby || ln.spoken, subs: { ...ln.subs } })
@@ -303,12 +303,16 @@ export function LinesPanel({ lang, projectId, order }: { lang: Lang; projectId: 
               const ln = lines.find((x) => x.id === n.line_id)
               return (
                 <div className="study-note" key={i}>
-                  <div className="study-note-point">{n.point}</div>
+                  <div className="study-note-point"><AiText text={n.point} lang={lang} projectId={projectId} /></div>
                   {ln && <div className="line-spoken"><Ruby text={ln.ruby || ln.spoken} /></div>}
-                  <p>{n.explain}</p>
+                  <p><AiText text={n.explain} lang={lang} projectId={projectId} /></p>
                   <div className="section-note">{t.textbook}{lang === 'en' ? ': ' : '：'}<Ruby text={n.textbook} /></div>
                   <div className="section-note">{t.examples}{lang === 'en' ? ':' : '：'}</div>
-                  <ul>{n.examples.map((x, j) => <li key={j}><Ruby text={x} /></li>)}</ul>
+                  <ul>{n.examples.map((x, j) => {
+                    // 例句「日文 — 學習者語言的意思」：日文照原樣，意思跟介面語言（英文介面整段中文）
+                    const [ja, gloss] = x.split(' — ')
+                    return <li key={j}><Ruby text={ja} />{gloss && <> — <AiText text={gloss} lang={lang} projectId={projectId} /></>}</li>
+                  })}</ul>
                 </div>
               )
             })}

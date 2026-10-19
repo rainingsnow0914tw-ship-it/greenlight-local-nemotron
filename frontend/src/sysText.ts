@@ -60,6 +60,48 @@ const PATTERNS: { re: RegExp; tr: (m: RegExpMatchArray) => Tr }[] = [
     }),
   },
   {
+    // 生成一鏡的警告（routes/video.py：改用某一次拍的、首幀從哪來、缺參考圖、無聲版）
+    re: /^↺ 已改用第 (\d+) 次拍的版本。$/,
+    tr: (m) => ({
+      zh: m.input ?? m[0],
+      en: `↺ Switched to take ${m[1]}.`,
+      ja: `↺ ${m[1]} 回目のテイクに切り替えた。`,
+    }),
+  },
+  {
+    re: /^✓ 用你上傳的首幀。$/,
+    tr: (m) => ({ zh: m.input ?? m[0], en: '✓ Uses the first frame you uploaded.', ja: '✓ アップロードした最初のコマを使う。' }),
+  },
+  {
+    re: /^⚠ 這一鏡沒有 (.+) 的參考圖，只用文字描述叫模型畫，/,
+    tr: (m) => {
+      const who = m[1].split('、')
+      const en = who.map((w) => (w === '場景' ? 'the set' : w)).join(', ')
+      const ja = who.map((w) => (w === '場景' ? '背景' : w)).join('、')
+      return {
+        zh: m.input ?? m[0],
+        en: `⚠ No reference image for ${en} in this shot — the model draws it from text only, so the look or the place may change every time. Upload or prepare reference cards to keep it fixed.`,
+        ja: `⚠ このカットには ${ja} の参照画像がなく、文章だけで描かせている —— 見た目や場所が毎回変わるかもしれない。参照カードをアップロードするか用意すると固定できる。`,
+      }
+    },
+  },
+  {
+    re: /^上一鏡 (\S+) 還沒生成，這一鏡改用硬切。$/,
+    tr: (m) => ({ zh: m.input ?? m[0], en: `The previous shot ${m[1]} isn't rendered yet — this shot uses a hard cut.`, ja: `前のカット ${m[1]} がまだ生成されていないので、このカットはハードカットにした。` }),
+  },
+  {
+    re: /^讀不回 (\S+) 的影片，改用硬切。$/,
+    tr: (m) => ({ zh: m.input ?? m[0], en: `Couldn't read back the video of ${m[1]} — using a hard cut.`, ja: `${m[1]} の動画を読み込めなかったので、ハードカットにした。` }),
+  },
+  {
+    re: /^這一鏡以無聲版重拍（台詞被內容安全審查擋下）/,
+    tr: (m) => ({
+      zh: m.input ?? m[0],
+      en: 'This shot was re-rendered without sound (the line was blocked by the content safety check) — the line is shown as a subtitle; the script is unchanged.',
+      ja: 'このカットは無音版で撮り直した（台詞がコンテンツ安全チェックで止められた）—— 台詞は字幕で見せる。台本は変えていない。',
+    }),
+  },
+  {
     re: /^this plate was made before 2026-10-17 and has no saved prompt/,
     tr: (m) => ({
       zh: '這張空景是 10/17 改版前生的，沒有存提示詞，不能單張重生 —— 按「重新準備參考卡」整組重做。',

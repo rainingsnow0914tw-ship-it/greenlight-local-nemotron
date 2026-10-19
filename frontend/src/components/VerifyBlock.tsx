@@ -7,6 +7,7 @@
  */
 import { useState } from 'react'
 import { send, type Lang } from '../api'
+import { AiText } from './AiText'
 
 type Check = { id: string; level: 'pass' | 'warn' | 'fail' | 'look'; value: number | null; zh: string; en: string; ja: string }
 // 診斷裡給人看的字是 {zh, en}（舊紀錄是純字串）：照畫面語言挑，日文沒有就退回英文
@@ -84,6 +85,9 @@ export function VerifyBlock({ lang, projectId, order, shotId, verify, diagnosis,
 }) {
   const t = T[lang]
   const sep = lang === 'en' ? ': ' : '：'
+  // agent 寫的診斷常只有一種語言（L 會退回中文）：交給 AiText 照介面語言翻（範例 2、3 英文介面整段中文）
+  const Ai = ({ v }: { v: Tr | undefined }) => <AiText text={L(v, lang)} lang={lang} projectId={projectId} />
+
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   if (!verify || !verify.checks) return null
@@ -154,10 +158,10 @@ export function VerifyBlock({ lang, projectId, order, shotId, verify, diagnosis,
                     <span className="tag">{p.by === 'rule' ? t.byRule : t.byAgent}</span>
                     <span className={`tag ${p.regenerate ? 'guess' : 'good'}`}>{p.regenerate ? t.regen : t.noRegen}</span>
                   </div>
-                  <div><b>{t.cause}{sep}</b>{L(p.cause, lang)}</div>
-                  {L(p.reasoning, lang) && <div><b>{t.why}{sep}</b>{L(p.reasoning, lang)}</div>}
-                  <div><b>{t.fix}{sep}</b>{L(p.fix, lang)}{L(p.fix_detail, lang) ? ` — ${L(p.fix_detail, lang)}` : ''}</div>
-                  {L(p.tradeoff, lang) && <div><b>{t.cost}{sep}</b>{L(p.tradeoff, lang)}</div>}
+                  <div><b>{t.cause}{sep}</b><Ai v={p.cause} /></div>
+                  {L(p.reasoning, lang) && <div><b>{t.why}{sep}</b><Ai v={p.reasoning} /></div>}
+                  <div><b>{t.fix}{sep}</b><Ai v={p.fix} />{L(p.fix_detail, lang) ? <> — <Ai v={p.fix_detail} /></> : ''}</div>
+                  {L(p.tradeoff, lang) && <div><b>{t.cost}{sep}</b><Ai v={p.tradeoff} /></div>}
                   <div className="section-note"><b>{t.evidence}{sep}</b>{LL(p.evidence, lang).join(lang === 'en' ? '; ' : '、')}</div>
                   {p.example && (
                     <div className="verify-example">

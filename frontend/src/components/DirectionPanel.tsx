@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { makePollGate } from '../pollGate'
 import { AiText } from './AiText'
 import { FixShotButton } from './FixShotButton'
+import { sysText } from '../sysText'
 import type { Lang } from '../api'
 
 type LogEntry = { t: number; kind: string; [k: string]: unknown }
@@ -262,7 +263,7 @@ export function DirectionPanel({ lang, projectId, order, onDone }: {
           <div className="section-note">{GATE[lang].note}</div>
           {gate.map((g) => (
             <div key={g.shot_id} style={{ marginTop: 10 }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>{g.error}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>{sysText(g.error, lang)}</div>
               <FixShotButton projectId={projectId} order={order} error={g.error} lang={lang}
                 onFixed={(note) => { setFixNote(note); void loadGate(); onDone() }} />
             </div>

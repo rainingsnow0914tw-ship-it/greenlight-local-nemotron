@@ -17,6 +17,7 @@ import threading
 
 from pydantic import BaseModel
 
+from ..language.glossary import rows as glossary_rows
 from .env_boot import config_home
 
 logger = logging.getLogger(__name__)
@@ -65,11 +66,7 @@ def name_hints(glossary_text: str, lang: str) -> str:
         from pypinyin import lazy_pinyin
     except Exception:  # noqa: BLE001
         lazy_pinyin = None
-    for ln in (glossary_text or "").splitlines():
-        if "=" not in ln:
-            continue
-        name, rest = (x.strip() for x in ln.split("=", 1))
-        reading, _, english = (x.strip() for x in rest.partition("/"))
+    for name, reading, english, _ in glossary_rows(glossary_text, need_eq=True):
         target = {"en": english or reading or name, "ja": name, "zh": name}[lang]
         # 🔴 這串字是翻譯快取的鍵的一部分（範例專案附了預先翻好的快取），改寫法＝快取全部失效
         aliases = [name] + ([english] if english else [])
@@ -81,16 +78,15 @@ def name_hints(glossary_text: str, lang: str) -> str:
 
 def fix_names(text: str, glossary_text: str, lang: str) -> str:
     """模型自己拼的名字（月音 → Yueyin）換成名字表的寫法：英文 Tsukine、中日文 月音。
-    不靠翻譯：內容語言剛好跟介面一樣時根本不會經過翻譯，名字也要對。只換拉丁字母的拼法（整個字）。"""
+    不靠翻譯：內容語言剛好跟介面一樣時根本不會經過翻譯，名字也要對。只換拉丁字母的拼法（整個字）。
+    英文句子裡模型留下的「0.33 秒」也在這裡換成「0.33 s」（範例 3 診斷；快取裡的舊譯文一起修好）。"""
+    if lang == "en" and detect(text) == "en":
+        text = re.sub(r"(\d(?:\.\d+)?)\s*秒", r"\1 s", text)
     try:
         from pypinyin import lazy_pinyin
     except Exception:  # noqa: BLE001
         return text
-    for ln in (glossary_text or "").splitlines():
-        if "=" not in ln:
-            continue
-        name, rest = (x.strip() for x in ln.split("=", 1))
-        reading, _, english = (x.strip() for x in rest.partition("/"))
+    for name, reading, english, _ in glossary_rows(glossary_text, need_eq=True):
         if not re.search(r"[一-鿿]", name):
             continue
         target = {"en": english or reading or name, "ja": name, "zh": name}[lang]
@@ -173,4 +169,10 @@ def _call(texts: list[str], lang: str, names: str) -> list[str]:
     cfg = types.GenerateContentConfig(system_instruction=system, response_mime_type="application/json",
                                       response_schema=_Out, temperature=0.2)
     r = client.models.generate_content(model="", contents=json.dumps(texts, ensure_ascii=False), config=cfg)
-    return (r.parsed or _Out.model_validate_json(r.text)).items
+    if r.parsed:
+        return r.parsed.items
+    data = json.loads(r.text)
+    # 模型偶爾多包一層 {"_Out": {"items": [...]}}（範例 2 日文）：剝掉那一層再收
+    if isinstance(data, dict) and "items" not in data and len(data) == 1:
+        data = next(iter(data.values()))
+    return _Out.model_validate(data).items

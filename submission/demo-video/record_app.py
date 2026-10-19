@@ -5,7 +5,8 @@
   導航（切英文、點進專案）錄在每支的開頭，ready.json 記下「從第幾秒開始是要用的畫面」，剪接時從那裡切。
 - 只看不改：診斷修法只把滑鼠停在「Apply」上，不按（按了會改到測試專案的資料）。
 
-先開 EXE：GREENLIGHT_HOME=greenlight-local\\_private\\示範專案 GreenlightLocal.exe --server --url-file %TEMP%\\gl_url.txt
+先開 EXE（空的家＝評審第一次打開的樣子；錄內建範例 1、英文介面 —— 以前錄示範專案，標題段落都是中文）：
+  GREENLIGHT_HOME=<空資料夾> GreenlightLocal.exe --server --url-file %TEMP%\\gl_url.txt
 用法：.venv-rec/Scripts/python record_app.py [列號 ...]   （不給就六列全錄）
 輸出：錄影/<列號>.webm＋錄影/ready.json
 """
@@ -56,13 +57,13 @@ def home(page):
 
 def project(page):
     home(page)
-    page.get_by_text("第10章 場景61").first.click()
+    page.get_by_text("Sample 1 — Fully automatic").first.click()
     page.wait_for_timeout(1500)
 
 
 def segment(page):
     project(page)
-    page.get_by_role("button").filter(has_text="洗手台").first.click()
+    page.get_by_role("button").filter(has_text="Lisa questions Tsukine").first.click()
     # 等段落頁真的載完（診斷區塊最後才出來）再開始錄：第 5 列一次找不到「possible fixes」逾時
     page.get_by_text("Post-render checks (measured locally)").first.wait_for(state="attached", timeout=60000)
     page.wait_for_timeout(1500)
@@ -77,9 +78,9 @@ def row2(page):
     # 旁白：「So I started making my own. Drop in a story.」停在拖放區 → 「Get a finished film…」點進專案往下帶
     page.mouse.move(1140, 570)                       # 停在「拖放劇本」區
     page.wait_for_timeout(6000)
-    page.get_by_text("第10章 場景61").first.hover()
+    page.get_by_text("Sample 1 — Fully automatic").first.hover()
     page.wait_for_timeout(1200)
-    page.get_by_text("第10章 場景61").first.click()
+    page.get_by_text("Sample 1 — Fully automatic").first.click()
     page.wait_for_timeout(2500)
     glide(page, 2100, 11.5)
 
@@ -109,6 +110,16 @@ def row5(page):
     page.wait_for_timeout(5000)
 
 
+def row7_prep(page):
+    """字幕預覽預設是日中：在入鏡之前先切成英文（評審影片只給日英，不放日中版）。
+    在入鏡動作裡才切，畫面會先閃兩秒中文字幕。"""
+    segment(page)
+    page.get_by_text("Subtitle preview (click a line)").first.locator("xpath=..").get_by_role(
+        "button", name="English", exact=True).click()
+    page.evaluate("window.scrollTo(0, 0)")
+    page.wait_for_timeout(1500)
+
+
 def row7(page):
     """學語言：停在台詞表（原句 → 導過的日文＋讀音、語體、中英字幕、為什麼這樣說）→ 字幕預覽 → 學習筆記。
     停在台詞表和學習筆記上，不要只捲過回合紀錄。"""
@@ -136,7 +147,7 @@ def row8(page):
 
 
 ROWS = {2: (row2_prep, row2), 3: (segment, row3), 4: (segment, row4), 5: (segment, row5),
-        7: (segment, row7), 8: (segment, row8)}
+        7: (row7_prep, row7), 8: (segment, row8)}
 
 if __name__ == "__main__":
     want = [int(a) for a in sys.argv[1:]] or list(ROWS)

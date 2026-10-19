@@ -17,6 +17,7 @@ from typing import Any
 
 from ..services import project_store
 from . import gates, line_director
+from .glossary import rows as glossary_rows
 
 logger = logging.getLogger(__name__)
 _running: dict[tuple[str, int], threading.Thread] = {}
@@ -90,24 +91,14 @@ def people(state, seg) -> dict[str, str]:
 
 
 def _rows(state):
-    """名字表一行「名字=原聲唸法/英文寫法/個性」（後兩段可省）。例：深息=シェンシー/Shenxi/溫柔的男生，自稱僕。"""
-    for row in (state.name_glossary or "").splitlines():
-        name, _, rest = row.partition("=")
-        say, _, tail = rest.partition("/")
-        en, _, _ = tail.partition("/")
-        if name.strip():
-            yield name.strip(), say.strip(), en.strip()
+    """名字表每一行 (名字, 原聲唸法, 英文寫法)；拆法的家在 language/glossary.py。"""
+    for name, say, en, _ in glossary_rows(state.name_glossary):
+        yield name, say, en
 
 
 def personas(state) -> dict[str, str]:
     """{名字: 個性}：名字表第四段（幕後第 1 集：深息是溫柔的男生、自稱僕 —— 台詞導演不知道，重跑一次就變回「私」）。"""
-    out = {}
-    for row in (state.name_glossary or "").splitlines():
-        name, _, rest = row.partition("=")
-        parts = rest.split("/", 2)
-        if name.strip() and len(parts) == 3 and parts[2].strip():
-            out[name.strip()] = parts[2].strip()
-    return out
+    return {name: p for name, _, _, p in glossary_rows(state.name_glossary) if p}
 
 
 def glossary(state) -> dict[str, str]:

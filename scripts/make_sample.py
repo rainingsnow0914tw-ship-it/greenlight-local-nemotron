@@ -17,6 +17,8 @@
       加入或換掉一個範例（其他範例不動）
   python scripts/make_sample.py label
       只把 SAMPLES 裡的標題與說明重新寫進 sample/ 裡已有的範例（改了說明文字就跑這個）
+  python scripts/make_sample.py refs <來源資料夾> <專案 id> <範例代號 1|2|3>
+      只補參考圖（人物卡、臉、空景），專案存檔不動
 輸出：sample/（projects/、media/、cache_ui_translate.json），PyInstaller spec 會把它打包進去
 """
 from __future__ import annotations
@@ -112,6 +114,7 @@ def add(source: Path, project_id: str, key: str, cache: Path | None) -> None:
             total += f.stat().st_size
         else:
             missing.append(n)
+    total += _copy_refs(media_src, media_out)
     if cache:
         out = OUT / "cache_ui_translate.json"
         cur = json.loads(out.read_text(encoding="utf-8")) if out.exists() else {}
@@ -119,6 +122,25 @@ def add(source: Path, project_id: str, key: str, cache: Path | None) -> None:
         out.write_text(json.dumps({**new, **cur}, ensure_ascii=False), encoding="utf-8")
     print(f"sample {key} ({sid}): {len(names) - len(missing)} media files, {total / 1e6:.1f} MB"
           + (f", missing {missing}" if missing else ""))
+
+
+def _copy_refs(media_src: Path, media_out: Path) -> int:
+    """參考圖（ref_card_／ref_face_／ref_plate_…）：app 用檔名找（media_store.find），存檔裡沒有 local:// 網址，
+    只照網址複製就會漏掉 —— 三個範例的人物卡與空景全部是「Not yet」（評審看到的選角、空景是空的）。"""
+    size = 0
+    for f in sorted(media_src.glob("ref_*")):
+        shutil.copy2(f, media_out / f.name)
+        size += f.stat().st_size
+    return size
+
+
+def refs(source: Path, project_id: str, key: str) -> None:
+    sid = SAMPLES[key]["id"]
+    media_out = OUT / "media" / sid
+    if not media_out.exists():
+        raise SystemExit(f"sample {key} ({sid}) not in sample/ yet — run add first")
+    size = _copy_refs(source / "media" / project_id, media_out)
+    print(f"sample {key} ({sid}): {len(list(media_out.glob('ref_*')))} reference images, {size / 1e6:.1f} MB")
 
 
 def label() -> None:
@@ -142,9 +164,15 @@ def main() -> None:
     a.add_argument("key", choices=sorted(SAMPLES))
     a.add_argument("--cache", type=Path, help="另一個資料夾的 cache/ui_translate.json（預先翻好的英日文）")
     sub.add_parser("label")
+    r = sub.add_parser("refs")
+    r.add_argument("source", type=Path, help="來源資料夾（GREENLIGHT_HOME）")
+    r.add_argument("project_id")
+    r.add_argument("key", choices=sorted(SAMPLES))
     args = ap.parse_args()
     if args.cmd == "add":
         add(args.source, args.project_id, args.key, args.cache)
+    elif args.cmd == "refs":
+        refs(args.source, args.project_id, args.key)
     else:
         label()
 

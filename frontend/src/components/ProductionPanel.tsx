@@ -447,6 +447,7 @@ export function ProductionPanel({
                 key={clip.shot_id}
                 copy={copy}
                 lang={lang}
+                projectId={projectId}
                 clip={clip}
                 busy={busy}
                 verifyBlock={<VerifyBlock lang={lang} projectId={projectId} order={order} shotId={clip.shot_id}
@@ -621,6 +622,7 @@ function humanError(err: string, copy: Copy): string {
 function ClipCard({
   copy,
   lang,
+  projectId,
   clip,
   busy,
   onApprove,
@@ -631,6 +633,7 @@ function ClipCard({
 }: {
   copy: Copy
   lang: Lang
+  projectId: string
   clip: ClipRecord
   busy: string | null
   verifyBlock?: React.ReactNode
@@ -695,7 +698,8 @@ function ClipCard({
 
       {clip.warnings.filter((w) => !(clip.verify && w.includes('查證：'))).map((w, i) => (
         <div className="notice warn" key={i}>
-          {sysText(w, lang)}
+          {/* 對照表沒有的（製作人手寫的意見「✎ 製作人：…」等）照介面語言翻 */}
+          {sysText(w, lang) !== w ? sysText(w, lang) : <AiText text={w} lang={lang} projectId={projectId} />}
         </div>
       ))}
 
