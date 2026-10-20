@@ -134,8 +134,10 @@ over hundreds of lines I had already approved by hand and keep it only if it sta
 
 An AI director needs two things that grow together: a framework (rules it must follow, measurements it
 cannot argue with, a memory of what worked) and a model that can actually work inside it. Nemotron
-reasons through a whole scene within a token budget, calls our tools in the middle of its thinking, and
-when a gate names a rule and a shot, it fixes exactly that shot. Every rule and example in this app was
+reasons through a whole scene within a token budget, works from the timings and track record the
+program measures for it, and when a gate names a rule and a shot, it fixes exactly that shot. We also
+tested letting it call those tools itself mid-reasoning; doing the measuring for it was cheaper and
+passed more often, so that is the default. Every rule and example in this app was
 tuned against how Nemotron thinks, and that fit is what makes the loop converge.
 
 The second lesson is about resources. Most creators don't have a lab; they have one GPU, the open models

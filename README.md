@@ -252,8 +252,8 @@ steps.
 | Interface translation | Nemotron 3 Nano | Producer notes, diagnoses and explanations shown in the language you picked |
 
 **Why it is built on Nemotron.** The director loop asks a lot of a model: reason through a whole scene
-within a token budget, call tools in the middle of that reasoning (speech timing, the gates), and when a
-gate says "rule 7, shot s061_10", fix exactly that shot and nothing else. Nemotron does all three
+within a token budget, work from the speech timings and track record the program measures for it, and
+when a gate says "rule 7, shot s061_10", fix exactly that shot and nothing else. Nemotron does all three
 reliably, and the rules, gates and examples were tuned against how it thinks. Its open weights also mean
 the whole crew can one day run on the same NVIDIA GPU that renders the film.
 

@@ -64,10 +64,13 @@ text((48, 26), "LEARN JAPANESE", f1, WHITE, 3)
 text((48, 124), "FROM ANY STORY", f1, YELLOW, 3)
 f2 = ImageFont.truetype(SEMI, 34)
 text((52, 236), "AI anime  ·  readings over every kanji  ·  2 subtitles", f2, WHITE, 2)
+# 產品名（搜尋與評審對得上 Devpost 的專案名）
+text((52, 286), "Greenlight Local", ImageFont.truetype(BOLD, 34), GREEN, 2)
 
-# 右上角徽章：NVIDIA Nemotron · 自己的顯示卡
+# 右上角徽章：Nemotron 當導演、影片在自己的顯示卡生
+# （改：舊版寫「Nemotron runs on your own GPU」不對 —— Nemotron 走 Nebius 雲端，本機跑的是影片模型）
 fb = ImageFont.truetype(BOLD, 28)
-label, sub2 = "NVIDIA Nemotron", "runs on your own GPU"
+label, sub2 = "NVIDIA Nemotron", "directs · your GPU renders"
 bw = int(max(d.textlength(label, font=fb), d.textlength(sub2, font=ImageFont.truetype(SEMI, 22)))) + 40
 d.rounded_rectangle((W - bw - 36, 34, W - 36, 120), radius=14, fill=GREEN)
 d.text((W - bw - 16, 42), label, font=fb, fill=(0, 0, 0))
