@@ -173,3 +173,23 @@ textbook.
 
 **📱 Beyond the desktop.** A companion viewer for phones and tablets for watching and studying, and a
 studio edition that runs the same pipeline on a shared GPU server for teams.
+
+## 🧪 How to test it
+
+**Quick look, about one minute, no GPU and no API key.** Download `GreenlightLocal-Setup.exe` from the
+[latest release](https://github.com/rainingsnow0914tw-ship-it/greenlight-local-nemotron/releases/latest)
+(Windows 10/11 64-bit; it installs for the current user with no administrator prompt; if SmartScreen
+warns because the installer is not code-signed, choose **More info → Run anyway**). Open Greenlight Local:
+the project list already holds three finished, read-only samples. Open **Sample 1**, then its scene, and
+scroll from top to bottom: the director's rounds and what the gates caught, the producer's notes, the
+reference cards, each shot's measured checks and diagnosis, the study-mode line table and notes, and the
+finished film. Switch **EN / 中文 / 日本語** at the top right; the samples' notes are translated in
+advance, so this works without a key. Samples 2 and 3 show your own art used as-is, and character cards
+only.
+
+**Directing your own script** needs a Nebius Token Factory key: **Settings → ② Your keys**, then drop a
+script on the home page and press **Start directing**. **Rendering video** needs an NVIDIA GPU with 24 GB
+of memory: **Settings → ① This computer** runs the check and the one-click installer for ComfyUI and the
+models. MiniMax H3's license excludes the United States, the European Union, the United Kingdom and South
+Korea; in those regions the samples and every Nemotron step still work, and only local rendering is
+affected. The README has the full guide.
