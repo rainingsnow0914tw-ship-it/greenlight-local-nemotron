@@ -1,5 +1,6 @@
 # YouTube upload
 
+- Uploaded: https://youtu.be/LDmAWysd5ys (2026-10-20, currently Unlisted — switch to Public before submitting; the rules ask for a publicly visible video)
 - File: `demo-video/成片/greenlight_local_demo.mp4` (2:25, 1080p)
 - Thumbnail: `screenshots/thumbnail_youtube.png` (1280×720; regenerate with `python make_thumbnail.py`)
 - Captions: the English narration subtitles are already burned in; don't upload the .srt as well (it would show twice)
@@ -37,8 +38,8 @@ Built for the Nebius × NVIDIA Global AI Hackathon.
 Reasoning: NVIDIA Nemotron 3 (Super, Ultra, Nano) via Nebius Token Factory. Video: MiniMax H3 in ComfyUI on a local NVIDIA GPU.
 
 Code and installer: https://github.com/rainingsnow0914tw-ship-it/greenlight-local-nemotron
-Devpost: <add the project link>
+Devpost: https://devpost.com/software/greenlight-local-nvidia-nemotron-edition
 
 Made by Chloe Kao.
 
-#NVIDIA #Nemotron #Nebius #LearnJapanese #AIAnime #ComfyUI
+NVIDIA,Nemotron,Nebius,LearnJapanese,AIAnime,ComfyUI
