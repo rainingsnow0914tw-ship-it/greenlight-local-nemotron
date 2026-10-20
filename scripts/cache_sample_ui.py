@@ -17,9 +17,10 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 URL, HOME = sys.argv[1], Path(sys.argv[2])
 OUT = Path(__file__).resolve().parent.parent / "sample" / "cache_ui_translate.json"
-LANG_BTN = {"en": "EN", "ja": "日本語"}
-SAMPLES = ("Sample 1", "Sample 2", "Sample 3")
-SAMPLE_JA = ("サンプル 1", "サンプル 2", "サンプル 3")
+# 中文也要跑：關卡規則說明是英文（寫給導演模型看的），中文介面要翻
+LANG_BTN = {"en": "EN", "ja": "日本語", "zh": "中文"}
+SAMPLE_NAMES = {"en": ("Sample 1", "Sample 2", "Sample 3"), "ja": ("サンプル 1", "サンプル 2", "サンプル 3"),
+                "zh": ("範例 1", "範例 2", "範例 3")}
 
 
 def settle(page, seconds=90):
@@ -37,7 +38,7 @@ with sync_playwright() as p:
     b = p.chromium.launch()
     pg = b.new_page(viewport={"width": 1280, "height": 900})
     for lang, btn in LANG_BTN.items():
-        for name in (SAMPLES if lang == "en" else SAMPLE_JA):
+        for name in SAMPLE_NAMES[lang]:
             pg.goto(URL, wait_until="networkidle")
             pg.get_by_role("button", name=btn, exact=True).click()
             pg.wait_for_timeout(800)

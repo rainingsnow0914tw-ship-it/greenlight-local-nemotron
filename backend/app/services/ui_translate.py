@@ -30,7 +30,11 @@ def detect(text: str) -> str:
     """粗分 zh／ja／en：英文字母遠多於漢字＋假名就是英文；其次有假名是日文；漢字比英文字母多是中文。
 
     英文先判：審稿意見常是英文句子裡引一句日文（「Typo/missing particle 'に' in '気にかけてる'…」），
-    以前「有假名就算日文」→ 日文介面當它已經是日文、不翻，畫面上留一整句英文（實證）。"""
+    以前「有假名就算日文」→ 日文介面當它已經是日文、不翻，畫面上留一整句英文（實證）。
+    引號裡的字不算：中文意見引一句日文（「開頭「ヨシ！」與雜聲是亂語」）以前被當成日文、日文介面不翻。"""
+    bare = re.sub(r"「[^」]*」|『[^』]*』|“[^”]*”|\"[^\"]*\"", "", text)
+    if bare.strip():
+        text = bare
     kana = len(re.findall(r"[぀-ヿ]", text))
     han = len(re.findall(r"[一-鿿]", text))
     latin = len(re.findall(r"[A-Za-z]", text))
@@ -104,6 +108,15 @@ class _Out(BaseModel):
     items: list[str]
 
 
+def _stray_latin(src: str, out: str, lang: str, names: str) -> bool:
+    """中日文譯文裡有原文（和名字規則）沒出現過的英文字母單字＝模型混進了別的語言。
+    英文譯文不查（本來就是英文字）。只看 5 個字母以上的字，H3、lanczos 這類原文就有的照收。"""
+    if lang == "en":
+        return False
+    seen = {w.lower() for w in re.findall(r"[A-Za-z]{5,}", src + " " + names)}
+    return any(w.lower() not in seen for w in re.findall(r"[A-Za-z]{5,}", out))
+
+
 def translate(texts: list[str], lang: str, glossary_text: str = "") -> list[str]:
     """回傳與 texts 等長的譯文；已經是 lang 的、翻譯失敗的，照原文。"""
     if lang not in LANG_NAME:
@@ -116,7 +129,8 @@ def translate(texts: list[str], lang: str, glossary_text: str = "") -> list[str]
     need = []
     for i, t in todo:
         hit = cache.get(_key(t, lang, names))
-        if hit is not None:
+        # 快取裡存的是原文＝那次模型照抄回來（沒翻），當沒快取重翻；不然永遠卡在原文（範例 3 日文 20 句）
+        if hit is not None and hit.strip() != t.strip():
             out[i] = fix_names(hit, glossary_text, lang)
         else:
             need.append((i, t))
@@ -124,6 +138,15 @@ def translate(texts: list[str], lang: str, glossary_text: str = "") -> list[str]
         return out
     done: list[tuple[int, str, str]] = []
     _translate_chunk(need, lang, names, done)
+    # 譯文冒出原文沒有的外語字（日文診斷夾了西班牙文「demasiados」）：單句重翻一次，還是有就不收
+    # 照抄原文也一樣單句重翻（中文說明裡有「私／俺」這種字，整批送時模型當它已經是日文、原樣回來）
+    stray = [(i, t) for i, t, g in done if _stray_latin(t, g, lang, names) or g.strip() == t.strip()]
+    if stray:
+        done = [d for d in done if (d[0], d[1]) not in stray]
+        again: list[tuple[int, str, str]] = []
+        for item in stray:
+            _translate_chunk([item], lang, names, again)
+        done += [d for d in again if not _stray_latin(d[1], d[2], lang, names) and d[2].strip() != d[1].strip()]
     if not done:
         return out
     with _lock:
@@ -131,7 +154,8 @@ def translate(texts: list[str], lang: str, glossary_text: str = "") -> list[str]
         for i, t, g in done:
             g = fix_names((g or "").strip() or t, glossary_text, lang)
             out[i] = g
-            cache[_key(t, lang, names)] = g
+            if g.strip() != t.strip():
+                cache[_key(t, lang, names)] = g
         _cache_path().write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
     return out
 

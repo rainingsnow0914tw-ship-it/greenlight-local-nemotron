@@ -10,6 +10,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { Lang } from '../api'
+import { AiText } from './AiText'
 
 type Check = { id: string; status: 'ok' | 'warn' | 'block' | 'missing'; label: string; detail: string; fix: string }
 type Machine = { ready: boolean; can_install: boolean; checks: Check[] }
@@ -274,7 +275,8 @@ export function SettingsPanel({ lang }: { lang: Lang }) {
                   <tr key={c.id}>
                     <td><span className={`badge ${BADGE[c.status]}`}>{t.status[c.status]}</span></td>
                     <td>{ct.label}</td>
-                    <td>{CHECK_TEXT[lang][c.id]?.detail?.[c.status] ?? c.detail}{ct.fix && <div style={{ color: 'var(--sumi-faint)', marginTop: 4 }}>→ {ct.fix}</div>}</td>
+                    {/* 對照表沒有的細節是後端寫的英文（版本、顯示卡名、缺什麼）：中日介面交給 AiText（點檢） */}
+                    <td>{CHECK_TEXT[lang][c.id]?.detail?.[c.status] ?? (lang === 'en' ? c.detail : <AiText text={c.detail} lang={lang} />)}{ct.fix && <div style={{ color: 'var(--sumi-faint)', marginTop: 4 }}>→ {lang === 'en' ? ct.fix : <AiText text={ct.fix} lang={lang} />}</div>}</td>
                   </tr>
                 )
               })}

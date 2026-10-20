@@ -52,7 +52,11 @@ HUMAN_JA = {"嘴沒動": "口が動かない", "嘴有動": "口が動く", "動
 
 
 def _tr(zh: str, en: str, ja: str = "") -> dict:
-    """畫面上要顯示的字一律帶三種語言（英文、中文、日文介面各自看得懂）；缺日文才退回英文。"""
+    """畫面上要顯示的字一律帶三種語言（英文、中文、日文介面各自看得懂）；缺日文才退回英文。
+    日文混進中英文都沒有的外語字（「demasiados アクション」）就當沒有日文，退回英文、介面再翻。"""
+    from ..services.ui_translate import _stray_latin
+    if ja and _stray_latin(f"{zh} {en}", ja, "ja", ""):
+        ja = ""
     return {"zh": zh, "en": en or zh, "ja": ja or en or zh}
 
 

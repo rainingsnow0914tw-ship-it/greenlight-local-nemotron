@@ -16,6 +16,13 @@ const NAME: Record<Lang, Record<string, string>> = {
   ja: { ja: '日本語', zh: '中国語', en: '英語', ko: '韓国語' },
 }
 
+// 名字表的範例：名字本身是劇本裡的字（照原文），個性那一欄跟介面語言（點檢：英日介面寫死中文）
+const NAMES_EXAMPLE: Record<Lang, string> = {
+  zh: '深息=シェンシー/Shenxi/溫柔的男生，自稱僕\n月音=つきね/Tsukine/自稱私\n提示詞=プロンプト/prompt',
+  en: '深息=シェンシー/Shenxi/gentle boy, calls himself 僕\n月音=つきね/Tsukine/calls herself 私\n提示詞=プロンプト/prompt',
+  ja: '深息=シェンシー/Shenxi/やさしい男の子、一人称は僕\n月音=つきね/Tsukine/一人称は私\n提示詞=プロンプト/prompt',
+}
+
 const T = {
   zh: {
     title: '學語言模式', on: '開啟', off: '關閉',
@@ -113,7 +120,7 @@ export function LanguagePanel({ lang, projectId, onChanged }: { lang: Lang; proj
           <div className="lang-row">
             <div className="stat-label">{t.names}</div>
             <textarea className="lang-names" rows={3} value={names ?? st.name_glossary}
-              placeholder={'深息=シェンシー/Shenxi/溫柔的男生，自稱僕\n月音=つきね/Tsukine/自稱私\n提示詞=プロンプト/prompt'} onChange={(e) => setNames(e.target.value)} />
+              placeholder={NAMES_EXAMPLE[lang]} onChange={(e) => setNames(e.target.value)} />
             <div className="section-note">{t.namesHelp}</div>
             {names !== null && names !== st.name_glossary && (
               <div><button className="btn primary small" onClick={() => void save({ name_glossary: names }).then(() => setNames(null))}>{t.namesSave}</button></div>

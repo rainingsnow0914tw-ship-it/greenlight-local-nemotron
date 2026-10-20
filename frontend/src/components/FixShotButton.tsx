@@ -7,6 +7,7 @@
  */
 import { useState } from 'react'
 import type { Lang } from '../api'
+import { AiText } from './AiText'
 
 type Result = { status: 'fixed' | 'partial' | 'failed'; changed: string[]; removed: string[]; errors_before: number; errors_after: number }
 
@@ -75,4 +76,18 @@ export function FixShotButton({ projectId, order, error, lang, onFixed }: {
       {msg && <div style={{ flexBasis: '100%' }}>{msg}</div>}
     </div>
   )
+}
+
+const GATE_HEAD = {
+  zh: (s: string) => `${s} 沒過生成前關卡，先改分鏡再生：`,
+  en: (s: string) => `${s} didn't pass the pre-render checks — fix the shot first: `,
+  ja: (s: string) => `${s} は生成前のチェックを通らなかった。先に絵コンテを直してください：`,
+}
+
+/** 生成前關卡的訊息：開頭照介面語言，規則說明（後端寫給導演模型看的英文）交給 AiText 翻成介面語言。
+ *  以前中日介面這一段整段英文（點檢：中日介面唯一一塊英文）。 */
+export function GateMessage({ error, lang, projectId }: { error: string; lang: Lang; projectId: string }) {
+  const m = error.match(/^(\S+) 沒過生成前關卡，先改分鏡再生：([\s\S]*)$/)
+  if (!m) return <>{error}</>
+  return <>{GATE_HEAD[lang](m[1])}<AiText text={m[2]} lang={lang} projectId={projectId} /></>
 }

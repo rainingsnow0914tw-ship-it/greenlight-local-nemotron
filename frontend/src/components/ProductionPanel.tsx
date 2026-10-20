@@ -619,6 +619,9 @@ function humanError(err: string, copy: Copy): string {
   return err
 }
 
+// 製作人手寫的意見存成「✎ 製作人：…」：前綴照介面語言，內容交給 AiText（點檢：日文介面冒出「製作人」）
+const PRODUCER = { zh: '製作人', en: 'Producer', ja: 'プロデューサー' }
+
 function ClipCard({
   copy,
   lang,
@@ -699,7 +702,9 @@ function ClipCard({
       {clip.warnings.filter((w) => !(clip.verify && w.includes('查證：'))).map((w, i) => (
         <div className="notice warn" key={i}>
           {/* 對照表沒有的（製作人手寫的意見「✎ 製作人：…」等）照介面語言翻 */}
-          {sysText(w, lang) !== w ? sysText(w, lang) : <AiText text={w} lang={lang} projectId={projectId} />}
+          {sysText(w, lang) !== w ? sysText(w, lang)
+            : w.startsWith('✎ 製作人：') ? <>✎ {PRODUCER[lang]}{lang === 'en' ? ': ' : '：'}<AiText text={w.slice('✎ 製作人：'.length)} lang={lang} projectId={projectId} /></>
+            : <AiText text={w} lang={lang} projectId={projectId} />}
         </div>
       ))}
 

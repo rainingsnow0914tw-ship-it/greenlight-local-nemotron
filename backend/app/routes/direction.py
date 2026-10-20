@@ -148,6 +148,9 @@ def gate_issues(project_id: str, order: int):
     from ..engines import local as local_engine
 
     state, seg = _segment(project_id, order)
+    # 已經收下的鏡不列：片都做完了還寫「生成時會被擋」＋修鏡按鈕，自相矛盾（範例 1 有 7 鏡這樣）
+    from ..schemas.segment import ClipStatus
+    done = {c.shot_id for c in (seg.clips or []) if c.status == ClipStatus.APPROVED}
     out = []
     for sid, dscene in (seg.director_scenes or {}).items():
         same = [s for s in (seg.shot_list.shots if seg.shot_list else []) if s.director_scene_id == sid]
@@ -155,7 +158,7 @@ def gate_issues(project_id: str, order: int):
             continue
         scene, shots = local_engine.gate_scene(state, dscene), local_engine.gate_shots(seg, dscene, same)
         for s in same:
-            if s.gate_waived:
+            if s.gate_waived or s.shot_id in done:
                 continue
             errors = [i for i in gates.check_shot(scene, shots, s.shot_id) if i["level"] == "ERROR"]
             if errors:

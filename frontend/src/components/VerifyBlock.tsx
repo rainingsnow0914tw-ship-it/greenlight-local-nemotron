@@ -13,8 +13,19 @@ type Check = { id: string; level: 'pass' | 'warn' | 'fail' | 'look'; value: numb
 // 診斷裡給人看的字是 {zh, en}（舊紀錄是純字串）：照畫面語言挑，日文沒有就退回英文
 type Tr = string | Record<string, string>
 type TrList = string[] | Record<string, string[]>
-const L = (v: Tr | undefined, lang: Lang): string =>
-  !v ? '' : typeof v === 'string' ? v : (v[lang] ?? v.en ?? v.zh ?? '')
+// 中日文欄混進中英文都沒有的外語字（「demasiados アクション」）＝那一欄不可信，退回英文、交給介面翻
+// （跟後端 ui_translate._stray_latin 同一個判斷；後端寫入時也擋，這裡讓舊紀錄也對）
+const stray = (src: string, out: string) => {
+  const seen = new Set((src.match(/[A-Za-z]{5,}/g) ?? []).map((w) => w.toLowerCase()))
+  return (out.match(/[A-Za-z]{5,}/g) ?? []).some((w) => !seen.has(w.toLowerCase()))
+}
+const L = (v: Tr | undefined, lang: Lang): string => {
+  if (!v) return ''
+  if (typeof v === 'string') return v
+  const own = v[lang]
+  if (own && lang !== 'en' && stray(`${v.zh ?? ''} ${v.en ?? ''}`, own)) return v.en ?? v.zh ?? ''
+  return own ?? v.en ?? v.zh ?? ''
+}
 const LL = (v: TrList | undefined, lang: Lang): string[] =>
   !v ? [] : Array.isArray(v) ? v : (v[lang] ?? v.en ?? v.zh ?? [])
 type Pick = {
