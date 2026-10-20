@@ -7,7 +7,7 @@
  */
 import { useState } from 'react'
 import { send, type Lang } from '../api'
-import { AiText } from './AiText'
+import { AiText, Gloss } from './AiText'
 
 type Check = { id: string; level: 'pass' | 'warn' | 'fail' | 'look'; value: number | null; zh: string; en: string; ja: string }
 // 診斷裡給人看的字是 {zh, en}（舊紀錄是純字串）：照畫面語言挑，日文沒有就退回英文
@@ -59,8 +59,9 @@ const T = {
 }
 
 /** 套用一個修法：改表演句／改台詞的要先讓人看（可改）新的那一句，再套用。 */
-function PickAction({ t, busy, editable, prefill, label, onApply }: {
+function PickAction({ t, busy, editable, prefill, label, onApply, gloss }: {
   t: (typeof T)['zh']; busy: boolean; editable: boolean; prefill: string; label: string; onApply: (text: string) => void
+  gloss?: React.ReactNode
 }) {
   const [text, setText] = useState(prefill)
   return (
@@ -68,6 +69,8 @@ function PickAction({ t, busy, editable, prefill, label, onApply }: {
       {editable && (
         <label className="line-edit">{label}
           <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} />
+          {/* 框裡是真的會送給影片模型的字（照原文）；介面不是中文時下面附翻譯 */}
+          {gloss}
         </label>
       )}
       <div className="prod-actions">
@@ -172,6 +175,7 @@ export function VerifyBlock({ lang, projectId, order, shotId, verify, diagnosis,
                   {p.source && <div className="section-note"><b>{t.source}{sep}</b>{lang === 'ja' ? (p.source_ja ?? p.source_en ?? p.source) : lang === 'en' ? (p.source_en ?? p.source) : p.source}</div>}
                   {p.applied ? <div className="notice">{t.applied}{L(p.applied, lang)}</div> : off ? <div className="section-note">{t.notChosen}</div> : (
                     <PickAction t={t} busy={busy} editable={editable} prefill={prefill}
+                      gloss={<Gloss text={prefill} lang={lang} projectId={projectId} />}
                       label={p.action === 'edit_line' ? t.newLine : t.newPerf}
                       onApply={(text) => void post('fix', editable ? { pick: i, text } : { pick: i })} />
                   )}

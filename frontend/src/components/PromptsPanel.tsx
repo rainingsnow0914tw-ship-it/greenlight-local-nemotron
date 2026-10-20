@@ -13,6 +13,7 @@
  */
 
 import { Icon } from './Icons'
+import { Gloss } from './AiText'
 import { useCallback, useEffect, useState } from 'react'
 import { promptsApi, type Lang, type PromptsResponse, type ShotPrompt } from '../api'
 import { LANGS, PROMPT_SECTIONS, type Copy } from '../i18n'
@@ -151,7 +152,7 @@ export function PromptsPanel({ copy, lang, projectId, order, onError }: Props) {
               {p.voice_role === 'offscreen' && (
                 <span className="tag">{copy.promptsOffscreen}</span>
               )}
-              <span className="prompt-preview">{p.segments.description || p.full}</span>
+              <span className="prompt-preview">{p.segments.description || p.full}<Gloss text={p.segments.description || p.full} lang={lang} projectId={projectId} /></span>
               <button
                 className="btn small"
                 onClick={() => void copyPrompt(p)}

@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { makePollGate } from '../pollGate'
-import { AiText } from './AiText'
+import { AiText, Gloss } from './AiText'
 import { FixShotButton } from './FixShotButton'
 import { sysText } from '../sysText'
 import type { Lang } from '../api'
@@ -238,7 +238,10 @@ export function DirectionPanel({ lang, projectId, order, onDone }: {
                 {Boolean(e.final_cut) && <span className="direction-warn"> · {t.finalCut}</span>}
                 {(e.dropped as number) > 0 && <span className="direction-warn"> · {t.dropped(e.dropped as number)}</span>}
                 {notes.map((n, j) => <div key={j} className="direction-sub">
-                  {(n.shots ?? []).join(lang === 'en' ? ', ' : '、')}{lang === 'en' ? ': ' : '：'}「{n.quote}」— <AiText text={n.problem} lang={lang} projectId={projectId} /></div>)}
+                  {/* 整體意見沒有鏡號、沒有引文：不印空的「：「」」（範例 2） */}
+                  {(n.shots ?? []).length > 0 && <>{(n.shots ?? []).join(lang === 'en' ? ', ' : '、')}{lang === 'en' ? ': ' : '：'}</>}
+                  {n.quote && <>「{n.quote}」<Gloss text={n.quote} lang={lang} projectId={projectId} />— </>}
+                  <AiText text={n.problem} lang={lang} projectId={projectId} /></div>)}
               </li>
             }
             if (e.kind === 'scene_done') return <li key={i} className="ok"><span className="direction-at">{at}</span>

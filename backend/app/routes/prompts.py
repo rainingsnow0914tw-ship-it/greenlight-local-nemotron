@@ -46,6 +46,21 @@ def _segment(project_id: str, order: int):
     return state, segment
 
 
+def _fix_prompt_names(state, segment) -> None:
+    """改寫成英文／日文的畫面描述，名字照名字表（月音 → Tsukine，不是模型自己拼的 Yueyin）。
+
+    改寫的模型只看得到中文名，會自己拼拼音（範例 2 英文提示詞整段 Yueyin）；
+    名字表的寫法有唯一的家（language/glossary.py），換名字用介面翻譯同一支 fix_names。"""
+    from ..services.ui_translate import fix_names
+
+    lang = segment.shot_list.prompt_language
+    if not lang or lang == "zh" or not state.name_glossary:
+        return
+    for shot in segment.shot_list.shots:
+        if getattr(shot, "visual_prompt", None):
+            shot.visual_prompt = fix_names(shot.visual_prompt, state.name_glossary, lang)
+
+
 @router.get("/{project_id}/segments/{order}/prompts")
 def get_prompts(project_id: str, order: int) -> dict:
     """整段的提示詞，分段呈現。$0。
@@ -60,6 +75,7 @@ def get_prompts(project_id: str, order: int) -> dict:
     #    Omni 走敘事式、Veo 走標籤式。使用者複製走的那段，
     #    就是送給模型的那段 —— 不然這一關的透明度是假的。
     tier = (state.chosen_tier.value if state.chosen_tier else None) or config_loader.default_veo_tier()
+    _fix_prompt_names(state, segment)   # 舊資料（範例）裡已經寫成 Yueyin 的，讀的時候也照名字表
     prompts = prompt_export.build_all(segment.shot_list, casting, tier)
 
     # 誠實提醒要精確：
@@ -135,6 +151,7 @@ def rewrite_prompts(project_id: str, order: int, lang: str = "en") -> dict:
         raise HTTPException(status_code=502, detail=f"改寫失敗：{exc}") from exc
 
     segment.shot_list.prompt_language = lang
+    _fix_prompt_names(state, segment)
     state.spend.llm_usd += usage["cost_usd"]
     state.record_decision(
         choice=f"第 {order} 段提示詞改寫成 {lang}",

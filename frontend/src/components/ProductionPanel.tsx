@@ -321,7 +321,7 @@ export function ProductionPanel({
               <span className="price">${test.estimated_cost_usd}</span>
             </button>
             <span className="prompt-preview">
-              {test.candidate_shot_id} · {test.candidate_description}
+              {test.candidate_shot_id} · <AiText text={test.candidate_description} lang={lang} projectId={projectId} />
             </span>
           </div>
         )}

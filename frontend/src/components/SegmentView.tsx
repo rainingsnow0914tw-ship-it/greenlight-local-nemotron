@@ -178,7 +178,7 @@ export function SegmentView({
       <p className="eyebrow">
         {copy.segments} {seg.order}
       </p>
-      <h1>{nameText(seg.title, lang)}</h1>
+      <h1>{nameText(seg.title, lang) !== seg.title ? nameText(seg.title, lang) : <AiText text={seg.title} lang={lang} projectId={projectId} />}</h1>
 
       <div className="stats">
         <div>

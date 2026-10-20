@@ -67,3 +67,10 @@ export function useAiText(text: string | null | undefined, lang: Lang, projectId
 export function AiText({ text, lang, projectId }: { text: string | null | undefined; lang: Lang; projectId?: string }) {
   return <>{useAiText(text, lang, projectId)}</>
 }
+
+/** 引用的中文原文（導演意見引的分鏡字、要給影片模型的表演句）：原文照留（是證據／是真的送出去的字），
+ *  介面不是中文時在後面括號附上翻譯。日文台詞（有假名）不附 —— 那是學語言的內容。 */
+export function Gloss({ text, lang, projectId }: { text: string | null | undefined; lang: Lang; projectId?: string }) {
+  if (!text || lang === 'zh' || !/[一-鿿]/.test(text) || /[぀-ヿ]/.test(text)) return null
+  return <span className="section-note"> (<AiText text={text} lang={lang} projectId={projectId} />)</span>
+}
