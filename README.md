@@ -5,7 +5,7 @@ on your own computer, and checked shot by shot before anyone watches it.**
 
 🌏 **The whole app works in English, 中文 and 日本語**: every screen, every check and diagnosis, and even what Nemotron writes follow the language you pick.
 
-▶️ **[Watch the 2½-minute demo](https://youtu.be/LDmAWysd5ys)** · ⬇️ **[Download the installer](../../releases/latest)**
+▶️ **[Watch the 2½-minute demo](https://youtu.be/wmvEbxeihWw)** · ⬇️ **[Download the installer](../../releases/latest)**
 
 ---
 

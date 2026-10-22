@@ -1,6 +1,6 @@
 # YouTube upload
 
-- Uploaded: https://youtu.be/LDmAWysd5ys (2026-10-20, currently Unlisted — switch to Public before submitting; the rules ask for a publicly visible video)
+- Uploaded: https://youtu.be/wmvEbxeihWw (2026-10-23, on a dedicated Greenlight Local channel so the personal channel stays untouched; currently Unlisted — switch to Public before submitting, the official rules ask for a publicly visible video). The earlier upload on the personal channel (LDmAWysd5ys) is no longer used.
 - File: `demo-video/成片/greenlight_local_demo.mp4` (2:25, 1080p)
 - Thumbnail: `screenshots/thumbnail_youtube.png` (1280×720; regenerate with `python make_thumbnail.py`)
 - Captions: the English narration subtitles are already burned in; don't upload the .srt as well (it would show twice)
