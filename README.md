@@ -9,6 +9,31 @@ on your own computer, and checked shot by shot before anyone watches it.**
 
 ---
 
+## 🧪 Try it in one minute (no GPU, no API key)
+
+1. **Install.** Download `GreenlightLocal-Setup.exe` from the [latest release](../../releases/latest) and run it
+   (Windows 10/11 64-bit; installs for your user, no administrator prompt). The installer is not code-signed,
+   so if SmartScreen appears, choose **More info → Run anyway**.
+2. **Open Sample 1.** Open **Greenlight Local**; the project list already holds three finished, read-only
+   samples. Click **Sample 1 — Fully automatic**, then its scene.
+3. **Scroll from top to bottom.** That is one whole run of the app, in order:
+   - **Shot list by the director (Nemotron):** every round, what the code gates caught, and the producer's
+     notes quoting the shots
+   - **Reference cards:** the characters and the empty sets the video model looks at
+   - **Test shot / Batch:** each rendered shot with its measured checks and the diagnosis, with possible fixes
+     side by side and their real cost
+   - **Line director (study mode):** each line rewritten for this speaker, with readings, two subtitles and why
+     it is said that way, then study notes
+   - **Finish:** the finished film with readings over the kanji and Japanese–English subtitles
+4. **Switch languages.** Press **EN / 中文 / 日本語** at the top right; every screen, check and note follows.
+5. **Compare Samples 2 and 3.** The same pipeline with your own art used exactly as drawn, and with character
+   cards only.
+
+Directing your own script needs a Nebius Token Factory key; rendering needs an NVIDIA GPU with 24 GB of
+memory. See [Install](#-install) and [Using it](#-using-it).
+
+---
+
 ## 💡 Why I built this
 
 I grew up watching anime. When I set out to learn Japanese, I hit the wall every learner knows: the
